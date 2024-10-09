@@ -95,8 +95,8 @@ def add_technical_indicators(df):
         df['bb_high'] = bollinger.bollinger_hband()
         df['bb_low'] = bollinger.bollinger_lband()
 
-        # Hinzufügen des Stochastic Oscillator
-        stochastic = ta.momentum.StochOscillator(high=df['High'], low=df['Low'], close=close)
+        # Korrigiertes Hinzufügen des Stochastic Oscillator
+        stochastic = ta.momentum.StochasticOscillator(high=df['High'], low=df['Low'], close=close, window=14)
         df['stoch'] = stochastic.stoch()
         df['stoch_signal'] = stochastic.stoch_signal()
 
@@ -111,6 +111,7 @@ def add_technical_indicators(df):
 
     return df
 
+
 def scale_data(df):
     """
     Skaliert die numerischen Daten des DataFrames.
@@ -121,13 +122,21 @@ def scale_data(df):
         print("Keine Daten zum Skalieren vorhanden.")
         return df
 
-    scaler = MinMaxScaler()
+    # Nur Spalten auswählen, die numerische Werte enthalten und keine reinen NaN-Werte sind
     numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns
-    if df[numeric_cols].empty:
+    numeric_cols = [col for col in numeric_cols if df[col].notna().any()]
+
+    if not numeric_cols:
         print("Keine numerischen Spalten zum Skalieren vorhanden.")
         return df
 
+    # NaN-Werte in den ausgewählten numerischen Spalten durch den Mittelwert ersetzen
+    df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+
+    # Skaliere die ausgewählten numerischen Spalten
+    scaler = MinMaxScaler()
     df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
+
     return df
 
 
