@@ -1,31 +1,56 @@
-# Code zum Sammeln von Daten mithilfe von yfinance und zum Säubern der Daten
-import yfinance as yf
+# Code zum Sammeln von Daten mithilfe der Kaggle API und zum Säubern der Daten
+import kaggle
 import pandas as pd
 import os
 import delete_data
 import ta  # Technische Analyse Bibliothek
-from ta.momentum import RSIIndicator, StochasticOscillator
-from ta.trend import MACD, SMAIndicator, EMAIndicator
-from ta.volatility import BollingerBands, AverageTrueRange
-from ta.volume import OnBalanceVolumeIndicator, MFIIndicator
+from ta.momentum import RSIIndicator
+from ta.trend import MACD
+from sklearn.preprocessing import MinMaxScaler
 from datetime import datetime, timedelta
+from kaggle.api.kaggle_api_extended import KaggleApi
+from tqdm import tqdm
+import time
 
+# Setze den Pfad für kaggle.json, falls dieser nicht im Standardpfad liegt
+kaggle_json_path = "../kaggle.json"
+os.environ['KAGGLE_CONFIG_DIR'] = os.path.abspath(os.path.dirname(kaggle_json_path))
 
-def fetch_data(tickers, start_date, end_date):
+# Initialisieren der Kaggle API mit der kaggle.json Datei
+api = KaggleApi()
+api.authenticate()
+
+def fetch_data(dataset_name, raw_data_directory, retries=3):
     """
-    Holt historische Daten von Yahoo Finance für mehrere Ticker und gibt sie als DataFrame zurück.
-    :param tickers: Liste der Symbole der Aktien oder Kryptowährungen (z.B. ['AAPL', 'MSFT', 'BTC-USD'])
-    :param start_date: Startdatum der Daten (im Format 'YYYY-MM-DD')
-    :param end_date: Enddatum der Daten (im Format 'YYYY-MM-DD')
-    :return: DataFrame mit den erhaltenen Daten für alle Ticker
+    Holt historische Daten von Kaggle und speichert sie als CSV-Dateien.
+    :param dataset_name: Der Name des Kaggle-Datensatzes (z.B. 'jacksoncrow/stock-market-dataset')
+    :param raw_data_directory: Verzeichnis zum Speichern der rohen Daten
+    :param retries: Anzahl der Wiederholungsversuche bei Fehlern
     """
-    data = yf.download(tickers, start=start_date, end=end_date, group_by='ticker')
-    if not data.empty:
-        return data
-    else:
-        print(f"Keine Daten für die angegebenen Ticker im Zeitraum von {start_date} bis {end_date} gefunden.")
-        return None
-
+    for attempt in range(retries):
+        try:
+            api.dataset_download_files(dataset_name, path=raw_data_directory, unzip=True)
+            csv_files = []
+            for root, _, files in os.walk(raw_data_directory):
+                for file in files:
+                    if file.endswith('.csv'):
+                        csv_files.append(os.path.join(root, file))
+            if csv_files:
+                dataframes = [pd.read_csv(file) for file in tqdm(csv_files, desc="Lade CSV-Dateien")]  # Ladeleiste für das Lesen der CSV-Dateien
+                combined_data = pd.concat(dataframes, ignore_index=True)
+                # Filtere Daten ab 2020, um die Datenmenge zu reduzieren
+                if 'Date' in combined_data.columns:
+                    combined_data['Date'] = pd.to_datetime(combined_data['Date'], errors='coerce')
+                    combined_data = combined_data[combined_data['Date'] >= '2020-01-01']
+                return combined_data
+            else:
+                print(f"Keine CSV-Dateien in {raw_data_directory} gefunden.")
+                return None
+        except Exception as e:
+            print(f"Fehler beim Herunterladen von {dataset_name}: {e}. Versuch {attempt + 1} von {retries}.")
+            time.sleep(5)  # Wartezeit zwischen den Versuchen
+    print(f"Download von {dataset_name} nach {retries} Versuchen fehlgeschlagen.")
+    return None
 
 def clean_data(df):
     """
@@ -33,90 +58,72 @@ def clean_data(df):
     :param df: DataFrame mit den rohen Daten
     :return: Gesäuberter DataFrame
     """
-    # Fülle alle fehlenden Werte mit NaN, um sicherzustellen, dass keine Zeilen gelöscht werden
-    df = df.fillna(value=pd.NA)
+    # Entferne Zeilen, bei denen Basiswerte fehlen
+    basis_columns = ['Close', 'Open', 'High', 'Low', 'Volume']
+    df = df.dropna(subset=basis_columns)
     # Entferne Duplikate
     df = df.drop_duplicates()
     return df
 
-
-def add_technical_indicators(df, ticker):
+def add_technical_indicators(df):
     """
     Fügt technische Indikatoren zum DataFrame hinzu.
     :param df: DataFrame mit den rohen oder gesäuberten Daten
-    :param ticker: das Symbol der Aktie oder Kryptowährung
     :return: DataFrame mit technischen Indikatoren
     """
     try:
-        close = df[(ticker, 'Close')]
-        high = df[(ticker, 'High')]
-        low = df[(ticker, 'Low')]
-        volume = df[(ticker, 'Volume')]
+        close = df['Close']
 
         if len(close) < 50:
-            print(f"Nicht genügend Daten für technische Indikatoren für {ticker} vorhanden.")
+            print(f"Nicht genügend Daten für technische Indikatoren vorhanden.")
             return df
 
         # Erstelle einen temporären DataFrame für die neuen Indikatoren
         indicators = pd.DataFrame(index=close.index)
 
         # Hinzufügen des RSI (Relative Strength Index)
-        indicators['rsi'] = ta.momentum.RSIIndicator(close=close, window=14).rsi()
+        indicators['rsi'] = RSIIndicator(close=close, window=14).rsi()
 
         # Hinzufügen des MACD (Moving Average Convergence Divergence)
-        macd = ta.trend.MACD(close=close)
+        macd = MACD(close=close)
         indicators['macd'] = macd.macd()
         indicators['macd_signal'] = macd.macd_signal()
-        indicators['macd_diff'] = macd.macd_diff()
 
-        # Hinzufügen von Bollinger Bändern
-        bollinger = ta.volatility.BollingerBands(close=close, window=20)
-        indicators['bollinger_mavg'] = bollinger.bollinger_mavg()
-        indicators['bollinger_hband'] = bollinger.bollinger_hband()
-        indicators['bollinger_lband'] = bollinger.bollinger_lband()
-
-        # Hinzufügen von gleitenden Durchschnitten
-        indicators['sma_50'] = ta.trend.SMAIndicator(close=close, window=50).sma_indicator()
-        indicators['sma_200'] = ta.trend.SMAIndicator(close=close, window=200).sma_indicator()
-        indicators['ema_50'] = ta.trend.EMAIndicator(close=close, window=50).ema_indicator()
-        indicators['ema_200'] = ta.trend.EMAIndicator(close=close, window=200).ema_indicator()
-
-        # Hinzufügen des Average True Range (ATR)
-        indicators['atr'] = ta.volatility.AverageTrueRange(high=high, low=low, close=close,
-                                                           window=14).average_true_range()
-
-        # Hinzufügen des Stochastic Oscillator
-        stoch = ta.momentum.StochasticOscillator(high=high, low=low, close=close, window=14)
-        indicators['stoch_k'] = stoch.stoch()
-        indicators['stoch_d'] = stoch.stoch_signal()
-
-        # Hinzufügen des On-Balance Volume (OBV)
-        indicators['obv'] = ta.volume.OnBalanceVolumeIndicator(close=close, volume=volume).on_balance_volume()
-
-        # Hinzufügen des Money Flow Index (MFI)
-        indicators['mfi'] = ta.volume.MFIIndicator(high=high, low=low, close=close, volume=volume,
-                                                   window=14).money_flow_index()
+        # Entferne Indikatoren, die komplett leer sind
+        indicators = indicators.dropna(axis=1, how='all')
 
         # Füge die Indikatoren zum ursprünglichen DataFrame hinzu (mit pd.concat, um Fragmentierung zu vermeiden)
         df = pd.concat([df, indicators], axis=1)
 
     except Exception as e:
-        print(f"Fehler beim Hinzufügen der technischen Indikatoren für {ticker}: {e}")
+        print(f"Fehler beim Hinzufügen der technischen Indikatoren: {e}")
 
+    return df
+
+def scale_data(df):
+    """
+    Skaliert die numerischen Daten des DataFrames.
+    :param df: DataFrame mit den gesäuberten Daten
+    :return: Skalierter DataFrame
+    """
+    if df.empty:
+        print("Keine Daten zum Skalieren vorhanden.")
+        return df
+
+    scaler = MinMaxScaler()
+    numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns
+    if df[numeric_cols].empty:
+        print("Keine numerischen Spalten zum Skalieren vorhanden.")
+        return df
+
+    df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
     return df
 
 
 if __name__ == "__main__":
     # Beispiel für das Sammeln von Daten und deren Säuberung
-    tickers = [
-        "AAPL", "MSFT", "GOOG", "AMZN", "TSLA", "META", "NFLX", "NVDA", "JPM", "V", "DIS", "INTC", "CSCO", "WMT", "PFE",
-        "XOM", "CVX", "BA", "MMM", "NKE", "PEP", "KO", "T", "VZ", "BTC-USD", "ETH-USD", "XRP-USD", "ADA-USD", "SOL-USD",
-        "DOT-USD", "BABA", "ORCL", "SAP", "TM", "NSRGY", "RY", "BNS", "HSBC", "SNY", "GSK", "LMT", "RTX", "MRNA", "ABT", "UNH",
-        "JNJ", "PG", "HD", "GS", "MS", "C", "BAC", "WFC", "ADBE", "PYPL", "CRM", "ZM", "SNAP", "SQ", "SPOT", "SHOP", "ZM",
-        "BIDU", "NTES", "JD", "TME", "BHP", "RIO", "VALE", "GLNCY", "BP", "SHEL", "ENB", "SU", "EQNR", "MCD",
-        "SBUX", "YUM", "CMG", "DPZ", "PINS", "TWLO", "F", "GM", "HMC", "RACE", "NSC", "UNP", "CSX", "PGR", "ALL", "TRV"
-    ]  # Erweiterte Liste der gewünschten Aktien oder Kryptowährungen
-    start_date = "2014-01-01"
+    dataset_names = ["jacksoncrow/stock-market-dataset", "jessevent/all-crypto-currencies"]  # Beispiel für zwei Kaggle-Datensätze
+    start_date = "2018-01-01"
     end_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Löschen des Speicherorts für alte Dateien
@@ -129,24 +136,28 @@ if __name__ == "__main__":
     os.makedirs(raw_data_directory, exist_ok=True)
     os.makedirs(processed_data_directory, exist_ok=True)
 
-    raw_data = fetch_data(tickers, start_date, end_date)
-    if raw_data is not None:
+    # Daten von beiden Datensätzen herunterladen und kombinieren
+    combined_data = pd.DataFrame()
+    for dataset_name in dataset_names:
+        raw_data = fetch_data(dataset_name, raw_data_directory)
+        if raw_data is not None:
+            combined_data = pd.concat([combined_data, raw_data], ignore_index=True)
+
+    if not combined_data.empty:
+        # Säubern der kombinierten Daten
+        cleaned_data = clean_data(combined_data)
+
+        # Hinzufügen von technischen Indikatoren
+        cleaned_data = add_technical_indicators(cleaned_data)
+
+        # Skalieren der Daten
+        scaled_data = scale_data(cleaned_data)
+
         # Aufteilen der Daten in kleinere Teile von jeweils 150 Zeilen und speichern
         chunk_size = 150
-        chunks = [raw_data.iloc[i:i + chunk_size] for i in range(0, len(raw_data), chunk_size)]
+        chunks = [scaled_data.iloc[i:i + chunk_size] for i in range(0, len(scaled_data), chunk_size)]
         for idx, chunk in enumerate(chunks):
-            chunk_file = os.path.join(raw_data_directory, f"raw_data_part_{idx + 1}.csv")
+            chunk_file = os.path.join(processed_data_directory, f"cleaned_data_part_{idx + 1}.csv")
             chunk.to_csv(chunk_file)
 
-        print("Rohdaten erfolgreich in Teile aufgeteilt und gespeichert.")
-
-        # Säubern und Speichern der einzelnen Teile
-        for idx in range(len(chunks)):
-            chunk_file = os.path.join(raw_data_directory, f"raw_data_part_{idx + 1}.csv")
-            chunk_data = pd.read_csv(chunk_file, header=[0, 1], index_col=0)
-            cleaned_chunk = clean_data(chunk_data)
-
-            # Speichern der gesäuberten Daten
-            cleaned_chunk.to_csv(os.path.join(processed_data_directory, f"cleaned_data_part_{idx + 1}.csv"))
-
-        print("Daten erfolgreich gesammelt, gesäubert und in Teilen gespeichert.")
+        print("Daten erfolgreich gesammelt, gesäubert, mit technischen Indikatoren erweitert, skaliert und in Teilen gespeichert.")
