@@ -41,7 +41,7 @@ def fetch_data(dataset_name, raw_data_directory, retries=3):
                 # Filtere Daten ab 2020, um die Datenmenge zu reduzieren
                 if 'Date' in combined_data.columns:
                     combined_data['Date'] = pd.to_datetime(combined_data['Date'], errors='coerce')
-                    combined_data = combined_data[combined_data['Date'] >= '2020-01-01']
+                    combined_data = combined_data[combined_data['Date'] >= '2010-01-01']
                 return combined_data
             else:
                 print(f"Keine CSV-Dateien in {raw_data_directory} gefunden.")
@@ -88,6 +88,17 @@ def add_technical_indicators(df):
         macd = MACD(close=close)
         indicators['macd'] = macd.macd()
         indicators['macd_signal'] = macd.macd_signal()
+
+        # Hinzufügen von Bollinger Bändern
+        bollinger = ta.volatility.BollingerBands(close=close)
+        df['bb_mavg'] = bollinger.bollinger_mavg()
+        df['bb_high'] = bollinger.bollinger_hband()
+        df['bb_low'] = bollinger.bollinger_lband()
+
+        # Hinzufügen des Stochastic Oscillator
+        stochastic = ta.momentum.StochOscillator(high=df['High'], low=df['Low'], close=close)
+        df['stoch'] = stochastic.stoch()
+        df['stoch_signal'] = stochastic.stoch_signal()
 
         # Entferne Indikatoren, die komplett leer sind
         indicators = indicators.dropna(axis=1, how='all')
