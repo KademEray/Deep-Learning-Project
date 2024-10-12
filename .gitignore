@@ -169,3 +169,5 @@ cython_debug/
 
 src/kaggle.json
 
+/models
+.idea/other.xml

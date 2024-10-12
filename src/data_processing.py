@@ -1,4 +1,4 @@
-# Code zum Sammeln von Daten mithilfe der Kaggle API und zum Säubern der Daten
+# Code zum Sammeln von Aktienmarktdaten mithilfe der Kaggle API und zum Säubern der Daten
 import kaggle
 import pandas as pd
 import os
@@ -7,7 +7,6 @@ import ta  # Technische Analyse Bibliothek
 from ta.momentum import RSIIndicator
 from ta.trend import MACD
 from sklearn.preprocessing import MinMaxScaler
-from datetime import datetime, timedelta
 from kaggle.api.kaggle_api_extended import KaggleApi
 from tqdm import tqdm
 import time
@@ -38,7 +37,7 @@ def fetch_data(dataset_name, raw_data_directory, retries=3):
             if csv_files:
                 dataframes = [pd.read_csv(file) for file in tqdm(csv_files, desc="Lade CSV-Dateien")]  # Ladeleiste für das Lesen der CSV-Dateien
                 combined_data = pd.concat(dataframes, ignore_index=True)
-                # Filtere Daten ab 2020, um die Datenmenge zu reduzieren
+                # Filtere Daten ab 2010, um die Datenmenge zu reduzieren
                 if 'Date' in combined_data.columns:
                     combined_data['Date'] = pd.to_datetime(combined_data['Date'], errors='coerce')
                     combined_data = combined_data[combined_data['Date'] >= '2010-01-01']
@@ -142,21 +141,24 @@ def scale_data(df):
 
 if __name__ == "__main__":
     # Beispiel für das Sammeln von Daten und deren Säuberung
-    dataset_names = ["jacksoncrow/stock-market-dataset", "jessevent/all-crypto-currencies"]  # Beispiel für zwei Kaggle-Datensätze
-    start_date = "2018-01-01"
-    end_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    dataset_names = ["jacksoncrow/stock-market-dataset"]  # Nur Aktienkurs-Daten verwenden
+    start_date = "2017-01-01"
+    end_date = "2022-01-01"
 
     # Löschen des Speicherorts für alte Dateien
     raw_data_directory = "../data/raw_data"
     processed_data_directory = "../data/processed_data"
+    processed_no_indicators_directory = os.path.join(processed_data_directory, "without_indicators")
+    processed_with_indicators_directory = os.path.join(processed_data_directory, "with_indicators")
 
     delete_data.delete_old_data(raw_data_directory, processed_data_directory)
 
     # Erstellen neuer Verzeichnisse
     os.makedirs(raw_data_directory, exist_ok=True)
-    os.makedirs(processed_data_directory, exist_ok=True)
+    os.makedirs(processed_no_indicators_directory, exist_ok=True)
+    os.makedirs(processed_with_indicators_directory, exist_ok=True)
 
-    # Daten von beiden Datensätzen herunterladen und kombinieren
+    # Daten herunterladen und kombinieren
     combined_data = pd.DataFrame()
     for dataset_name in dataset_names:
         raw_data = fetch_data(dataset_name, raw_data_directory)
@@ -167,17 +169,23 @@ if __name__ == "__main__":
         # Säubern der kombinierten Daten
         cleaned_data = clean_data(combined_data)
 
-        # Hinzufügen von technischen Indikatoren
-        cleaned_data = add_technical_indicators(cleaned_data)
-
-        # Skalieren der Daten
-        scaled_data = scale_data(cleaned_data)
-
-        # Aufteilen der Daten in kleinere Teile von jeweils 150 Zeilen und speichern
+        # Speichern der Daten ohne technische Indikatoren
         chunk_size = 150
-        chunks = [scaled_data.iloc[i:i + chunk_size] for i in range(0, len(scaled_data), chunk_size)]
-        for idx, chunk in enumerate(chunks):
-            chunk_file = os.path.join(processed_data_directory, f"cleaned_data_part_{idx + 1}.csv")
+        chunks_no_indicators = [cleaned_data.iloc[i:i + chunk_size] for i in range(0, len(cleaned_data), chunk_size)]
+        for idx, chunk in enumerate(chunks_no_indicators):
+            chunk_file = os.path.join(processed_no_indicators_directory, f"cleaned_data_no_indicators_part_{idx + 1}.csv")
             chunk.to_csv(chunk_file)
 
-        print("Daten erfolgreich gesammelt, gesäubert, mit technischen Indikatoren erweitert, skaliert und in Teilen gespeichert.")
+        # Hinzufügen von technischen Indikatoren
+        cleaned_data_with_indicators = add_technical_indicators(cleaned_data)
+
+        # Skalieren der Daten
+        scaled_data = scale_data(cleaned_data_with_indicators)
+
+        # Speichern der Daten mit technischen Indikatoren
+        chunks_with_indicators = [scaled_data.iloc[i:i + chunk_size] for i in range(0, len(scaled_data), chunk_size)]
+        for idx, chunk in enumerate(chunks_with_indicators):
+            chunk_file = os.path.join(processed_with_indicators_directory, f"cleaned_data_with_indicators_part_{idx + 1}.csv")
+            chunk.to_csv(chunk_file)
+
+        print("Daten erfolgreich gesammelt, gesäubert, mit technischen Indikatoren erweitert, skaliert und in den jeweiligen Verzeichnissen gespeichert.")
