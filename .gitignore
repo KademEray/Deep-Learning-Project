@@ -171,3 +171,4 @@ src/kaggle.json
 
 /models/*
 .idea/other.xml
+/data

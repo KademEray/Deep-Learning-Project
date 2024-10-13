@@ -51,12 +51,18 @@ def inverse_transform(predictions, scaler, feature_columns):
     return inverted[:, close_index]
 
 # Beste Buy- und Sell-Signale finden und optimieren
-def find_best_trades(predicted_prices, actual_prices, date_values, min_distance=10, profit_threshold=3500):
+def find_best_trades(predicted_prices, actual_prices, date_values, min_distance=10, volatility_threshold=0.01):
     buy_signals = argrelextrema(predicted_prices, np.less)[0]
     sell_signals = argrelextrema(predicted_prices, np.greater)[0]
 
     best_trades = []
-    last_trade_end = -1  # Zum Verhindern von Trades, die sich überschneiden
+    last_trade_end = -1  # Zum Verhindern von überschneidenden Trades
+
+    # Berechne die Volatilität als Standardabweichung der Preisänderungen
+    price_volatility = np.std(np.diff(actual_prices)) / np.mean(actual_prices)
+
+    # Dynamischer Mindestabstand basierend auf Volatilität
+    dynamic_min_distance = max(min_distance, int(volatility_threshold * len(actual_prices)))
 
     for buy in buy_signals:
         if buy < last_trade_end:
@@ -65,21 +71,27 @@ def find_best_trades(predicted_prices, actual_prices, date_values, min_distance=
         best_sell = None
         best_profit = -np.inf
 
+        # Suche nach dem besten Sell-Signal nach dem Buy-Signal
         for sell in sell_signals:
-            if sell > buy and (sell - buy) > min_distance:
-                profit = actual_prices[sell] - actual_prices[buy]  # Berechne den Profit anhand der tatsächlichen Preise
+            if sell > buy and (sell - buy) > dynamic_min_distance:
+                profit = actual_prices[sell] - actual_prices[buy]
                 if profit > best_profit:
                     best_sell = sell
                     best_profit = profit
 
-        # Nur Trades mit einem Mindestprofit auswählen
-        if best_sell is not None and best_profit > profit_threshold:
+        # Füge den besten Trade zur Liste hinzu, falls er einen Gewinn bringt
+        if best_sell is not None and best_profit > 0:
             best_trades.append((buy, best_sell, best_profit))
             last_trade_end = best_sell  # Setze das Ende des aktuellen Trades
+
+            # Entferne Signale in der aktuellen Buy-Sell-Phase, um Überschneidungen zu verhindern
+            buy_signals = buy_signals[buy_signals > best_sell]
+            sell_signals = sell_signals[sell_signals > best_sell]
 
     # Sortiere die Trades nach Gewinn und behalte maximal 3 Trades
     best_trades = sorted(best_trades, key=lambda x: x[2], reverse=True)[:3]
     return best_trades
+
 
 # Genauigkeit berechnen
 def calculate_accuracy(actual_prices, predicted_prices):
@@ -121,7 +133,7 @@ def evaluate_model(model_info, data, asset_name):
     print(f"{asset_name} MAE: {mae}")
     print(f"{asset_name} Genauigkeit: {accuracy:.2%}")
 
-    best_trades = find_best_trades(predictions_inv, actual_prices, date_values[50:], min_distance=10, profit_threshold=3500)
+    best_trades = find_best_trades(predictions_inv, actual_prices, date_values[50:], min_distance=10)
 
     plt.figure(figsize=(14, 7))
     plt.plot(date_values[50:], actual_prices, label='Tatsächlicher Preis')
@@ -146,8 +158,8 @@ if __name__ == "__main__":
     btc_data = add_technical_indicators(btc_data)
 
     model_info = {
-        "model_path": "../models/trained/lstm_standard_model",
-        "scaler_path": "../models/scaler.pkl",
+        "model_path": "../models/standard_model/btc_standard_model.h5",
+        "scaler_path": "../models/scaler/btc_scaler_with_indicators.pkl",
         "feature_columns": ['Open', 'High', 'Low', 'Close', 'Volume', 'Fed_Rate', 'Inflation', 'rsi', 'macd',
                             'macd_signal', 'bb_mavg', 'bb_high', 'bb_low', 'stoch', 'stoch_signal']
     }
