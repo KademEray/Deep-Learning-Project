@@ -109,7 +109,7 @@ if __name__ == "__main__":
         "ETH-USD": "eth",
         "SOL-USD": "sol"
     }
-    start_date = "2010-01-01"
+    start_date = "2000-01-01"
     end_date = "2022-01-01"
 
     raw_data_directory = "../data/raw_data"

@@ -1,20 +1,22 @@
-import yfinance as yf
-import matplotlib.pyplot as plt
-import pandas as pd
+import os
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import pickle
+import yfinance as yf
+from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import load_model
 import ta
-import os
-import pickle
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 from scipy.signal import argrelextrema
+
 
 # Datenabruf
 def fetch_test_data(symbol, start_date, end_date):
     data = yf.download(symbol, start=start_date, end=end_date, progress=False)
     data.reset_index(inplace=True)
     return data[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']]
+
 
 # Technische Indikatoren hinzufügen
 def add_technical_indicators(df):
@@ -26,15 +28,14 @@ def add_technical_indicators(df):
     df['bb_mavg'] = bollinger.bollinger_mavg()
     df['bb_high'] = bollinger.bollinger_hband()
     df['bb_low'] = bollinger.bollinger_lband()
-
     stochastic = ta.momentum.StochasticOscillator(high=df['High'], low=df['Low'], close=df['Close'], window=14)
     df['stoch'] = stochastic.stoch()
     df['stoch_signal'] = stochastic.stoch_signal()
-
     df.fillna(0, inplace=True)
     return df
 
-# Fehlende Spalten ergänzen und Reihenfolge sicherstellen
+
+# Fehlende Spalten ergänzen
 def add_missing_columns(df, required_columns):
     for col in required_columns:
         if col not in df.columns:
@@ -42,120 +43,128 @@ def add_missing_columns(df, required_columns):
     df = df[required_columns]
     return df
 
-# Inverse Transformation
+
+# Inverse Transformation der Vorhersagen
 def inverse_transform(predictions, scaler, feature_columns):
     dummy = np.zeros((len(predictions), len(feature_columns)))
     close_index = feature_columns.index('Close')
+    predictions = predictions.reshape(-1, 1)
     dummy[:, close_index] = predictions.flatten()
     inverted = scaler.inverse_transform(dummy)
     return inverted[:, close_index]
 
-# Beste Buy- und Sell-Signale finden und optimieren
-def find_best_trades(predicted_prices, actual_prices, date_values, min_distance=10, volatility_threshold=0.01):
-    buy_signals = argrelextrema(predicted_prices, np.less)[0]
-    sell_signals = argrelextrema(predicted_prices, np.greater)[0]
 
-    best_trades = []
-    last_trade_end = -1  # Zum Verhindern von überschneidenden Trades
-
-    # Berechne die Volatilität als Standardabweichung der Preisänderungen
-    price_volatility = np.std(np.diff(actual_prices)) / np.mean(actual_prices)
-
-    # Dynamischer Mindestabstand basierend auf Volatilität
-    dynamic_min_distance = max(min_distance, int(volatility_threshold * len(actual_prices)))
-
-    for buy in buy_signals:
-        if buy < last_trade_end:
-            continue  # Überspringe, wenn sich der Buy innerhalb eines laufenden Trades befindet
-
-        best_sell = None
-        best_profit = -np.inf
-
-        # Suche nach dem besten Sell-Signal nach dem Buy-Signal
-        for sell in sell_signals:
-            if sell > buy and (sell - buy) > dynamic_min_distance:
-                profit = actual_prices[sell] - actual_prices[buy]
-                if profit > best_profit:
-                    best_sell = sell
-                    best_profit = profit
-
-        # Füge den besten Trade zur Liste hinzu, falls er einen Gewinn bringt
-        if best_sell is not None and best_profit > 0:
-            best_trades.append((buy, best_sell, best_profit))
-            last_trade_end = best_sell  # Setze das Ende des aktuellen Trades
-
-            # Entferne Signale in der aktuellen Buy-Sell-Phase, um Überschneidungen zu verhindern
-            buy_signals = buy_signals[buy_signals > best_sell]
-            sell_signals = sell_signals[sell_signals > best_sell]
-
-    # Sortiere die Trades nach Gewinn und behalte maximal 3 Trades
-    best_trades = sorted(best_trades, key=lambda x: x[2], reverse=True)[:3]
-    return best_trades
-
-
-# Genauigkeit berechnen
+# Berechnung der Genauigkeit (Accuracy)
 def calculate_accuracy(actual_prices, predicted_prices):
     correct_trend = 0
     total_predictions = len(actual_prices) - 1
-
     for i in range(1, len(actual_prices)):
         actual_trend = actual_prices[i] - actual_prices[i - 1]
         predicted_trend = predicted_prices[i] - predicted_prices[i - 1]
-
         if (actual_trend >= 0 and predicted_trend >= 0) or (actual_trend < 0 and predicted_trend < 0):
             correct_trend += 1
-
     accuracy = correct_trend / total_predictions
     return accuracy
 
-# Modell evaluieren
-def evaluate_model(model_info, data, asset_name):
+
+# Buy- und Sell-Signale basierend auf den vorhergesagten Preisen
+def find_best_single_trade(predicted_prices, actual_prices, date_values):
+    buy_signals = argrelextrema(predicted_prices, np.less)[0]
+    sell_signals = argrelextrema(predicted_prices, np.greater)[0]
+
+    best_buy = None
+    best_sell = None
+    best_profit = -np.inf
+
+    # Suche das beste Buy-Signal und das beste Sell-Signal basierend auf dem Profit
+    for buy in buy_signals:
+        for sell in sell_signals:
+            if sell > buy:  # Sell muss nach Buy kommen
+                profit = actual_prices[sell] - actual_prices[buy]  # Berechnung des Profits auf Grundlage der tatsächlichen Preise
+                if profit > best_profit:
+                    best_buy = buy
+                    best_sell = sell
+                    best_profit = profit
+
+    return best_buy, best_sell, best_profit
+
+# Modell evaluieren ohne rekursive Vorhersagen und mit Buy/Sell basierend auf den Vorhersagen
+def evaluate_model(model_info, data, actual_data_2022, asset_name, prediction_steps=30):
     model = load_model(model_info["model_path"])
     with open(model_info["scaler_path"], 'rb') as f:
         scaler = pickle.load(f)
     feature_columns = model_info["feature_columns"]
 
-    date_values = data['Date'].values
+    actual_dates_2022 = actual_data_2022['Date'].values
+    actual_prices_2022 = actual_data_2022['Close'].values
 
+    # Verwende nur Daten bis zum 31.12.2021 für die Vorhersage
+    prediction_start_idx = len(data) - prediction_steps
     data = add_missing_columns(data, feature_columns)
     data = data[feature_columns]
-
     data_scaled = scaler.transform(data)
-    sequences = np.array([data_scaled[i:i + 50] for i in range(len(data_scaled) - 50)])
 
-    predictions = model.predict(sequences)
-    predictions_inv = inverse_transform(predictions, scaler, feature_columns)
+    # Nimm die letzten Daten als Eingabesequenz für das Modell (nur bis 2021)
+    input_sequence = data_scaled[prediction_start_idx - 50:prediction_start_idx]
 
-    actual_prices = data['Close'].values[50:]
-    mae = mean_absolute_error(actual_prices, predictions_inv)
-    accuracy = calculate_accuracy(actual_prices, predictions_inv)
+    # Vorhersage für 30 Schritte (1 Monat) basierend auf den Daten bis 2021
+    predictions = model.predict(input_sequence[np.newaxis, :, :])
+    predictions_inv = inverse_transform(predictions.flatten(), scaler, feature_columns)
 
-    print(f"{asset_name} MAE: {mae}")
-    print(f"{asset_name} Genauigkeit: {accuracy:.2%}")
+    # Vergleiche die Vorhersagen mit den tatsächlichen Daten aus 2022
+    prediction_steps = min(len(actual_dates_2022), len(predictions_inv), prediction_steps)
 
-    best_trades = find_best_trades(predictions_inv, actual_prices, date_values[50:], min_distance=10)
+    # Berechnung der Genauigkeit mit RMSE und MAE
+    rmse = np.sqrt(mean_squared_error(actual_prices_2022[:prediction_steps], predictions_inv[:prediction_steps]))
+    mae = mean_absolute_error(actual_prices_2022[:prediction_steps], predictions_inv[:prediction_steps])
+    accuracy = calculate_accuracy(actual_prices_2022[:prediction_steps], predictions_inv[:prediction_steps])
 
+    print(f"RMSE: {rmse:.2f}")
+    print(f"MAE: {mae:.2f}")
+    print(f"Genauigkeit (Steigung/Senkung): {accuracy:.2%}")
+
+    # Buy- und Sell-Signale basierend auf den Vorhersagen finden und tatsächlichen Profit berechnen
+    buy_signal, sell_signal, profit = find_best_single_trade(predictions_inv[:prediction_steps],
+                                                             actual_prices_2022[:prediction_steps],
+                                                             actual_dates_2022[:prediction_steps])
+
+    # Ausgabe der Vorhersagen und tatsächlichen Preise in eine CSV-Datei
+    prediction_df = pd.DataFrame({
+        'Datum': actual_dates_2022[:prediction_steps],
+        'Tatsächlicher Preis': actual_prices_2022[:prediction_steps],
+        'Vorhergesagter Preis': predictions_inv[:prediction_steps]
+    })
+    prediction_df.to_csv('btc_predictions.csv', index=False)
+    print("Vorhersagen und tatsächliche Preise wurden in 'btc_predictions.csv' gespeichert.")
+
+    # Plotten der Vorhersagen und tatsächlichen Preise
     plt.figure(figsize=(14, 7))
-    plt.plot(date_values[50:], actual_prices, label='Tatsächlicher Preis')
-    plt.plot(date_values[50:], predictions_inv, label='Vorhergesagter Preis')
+    plt.plot(actual_dates_2022[:prediction_steps], actual_prices_2022[:prediction_steps], label='Tatsächlicher Preis')
+    plt.plot(actual_dates_2022[:prediction_steps], predictions_inv[:prediction_steps], label='Vorhergesagter Preis')
 
-    for trade in best_trades:
-        buy, sell, profit = trade
-        plt.scatter(date_values[50:][buy], predictions_inv[buy], marker='^', color='g', label=f'Buy ({date_values[50:][buy]})')
-        plt.scatter(date_values[50:][sell], predictions_inv[sell], marker='v', color='r', label=f'Sell ({date_values[50:][sell]})')
-        print(f"Buy am {date_values[50:][buy]} für {predictions_inv[buy]:.2f} und Sell am {date_values[50:][sell]} für {predictions_inv[sell]:.2f} mit Profit von {profit:.2f}")
-
-    plt.title(f'{asset_name} - {model_info["model_path"]}')
-    plt.legend()
+    # Buy- und Sell-Signale anzeigen
+    if buy_signal is not None and sell_signal is not None:
+        plt.scatter(actual_dates_2022[buy_signal], predictions_inv[buy_signal], marker='^', color='g', label='Buy Signal')
+        plt.scatter(actual_dates_2022[sell_signal], predictions_inv[sell_signal], marker='v', color='r', label='Sell Signal')
+        print(f"Buy am {actual_dates_2022[buy_signal]} für {predictions_inv[buy_signal]:.2f} und Sell am {actual_dates_2022[sell_signal]} für {predictions_inv[sell_signal]:.2f} mit Profit von {profit:.2f}")
 
     # Genauigkeit im Diagramm anzeigen
-    plt.text(0.02, 0.95, f"Genauigkeit: {accuracy:.2%}", transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
+    plt.text(0.02, 0.95, f"Genauigkeit: {accuracy:.2%}", transform=plt.gca().transAxes, fontsize=12,
+             verticalalignment='top')
 
+    plt.title(f'{asset_name} - Vorhersage für 1 Monat in 2022')
+    plt.legend()
     plt.show()
 
+
 if __name__ == "__main__":
-    btc_data = fetch_test_data('BTC-USD', '2022-01-01', '2022-12-01')
-    btc_data = add_technical_indicators(btc_data)
+    # Lade Daten bis Ende 2021
+    btc_data = fetch_test_data('BTC-USD', '2010-01-01', '2021-12-31')
+    btc_data_with_indicators = add_technical_indicators(btc_data.copy())
+
+    # Lade nur die Daten für 2022 zur Evaluierung (nicht für Vorhersage)
+    btc_data_2022 = fetch_test_data('BTC-USD', '2022-01-01', '2022-01-31')
+    btc_data_2022 = add_technical_indicators(btc_data_2022)
 
     model_info = {
         "model_path": "../models/standard_model/btc_standard_model.h5",
@@ -164,4 +173,4 @@ if __name__ == "__main__":
                             'macd_signal', 'bb_mavg', 'bb_high', 'bb_low', 'stoch', 'stoch_signal']
     }
 
-    evaluate_model(model_info, btc_data, "Bitcoin")
+    evaluate_model(model_info, btc_data_with_indicators, btc_data_2022, "Bitcoin", prediction_steps=30)
