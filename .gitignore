@@ -172,3 +172,9 @@ src/kaggle.json
 /models/*
 .idea/other.xml
 /data
+Experiment/Experiment_1/btc_predictions.csv
+Experiment/Experiment_1/eth_predictions.csv
+Experiment/Experiment_1/sol_predictions.csv
+Experiment/Experiment_2/btc_no_indicators_predictions.csv
+Experiment/Experiment_2/eth_no_indicators_predictions.csv
+Experiment/Experiment_2/sol_no_indicators_predictions.csv

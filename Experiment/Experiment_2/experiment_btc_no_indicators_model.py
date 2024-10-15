@@ -4,9 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pickle
 import yfinance as yf
-from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import load_model
-import ta
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from scipy.signal import argrelextrema
 
@@ -16,23 +14,6 @@ def fetch_test_data(symbol, start_date, end_date):
     data = yf.download(symbol, start=start_date, end=end_date, progress=False)
     data.reset_index(inplace=True)
     return data[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']]
-
-
-# Technische Indikatoren hinzufügen
-def add_technical_indicators(df):
-    df['rsi'] = ta.momentum.RSIIndicator(close=df['Close'], window=14).rsi()
-    macd = ta.trend.MACD(close=df['Close'])
-    df['macd'] = macd.macd()
-    df['macd_signal'] = macd.macd_signal()
-    bollinger = ta.volatility.BollingerBands(close=df['Close'])
-    df['bb_mavg'] = bollinger.bollinger_mavg()
-    df['bb_high'] = bollinger.bollinger_hband()
-    df['bb_low'] = bollinger.bollinger_lband()
-    stochastic = ta.momentum.StochasticOscillator(high=df['High'], low=df['Low'], close=df['Close'], window=14)
-    df['stoch'] = stochastic.stoch()
-    df['stoch_signal'] = stochastic.stoch_signal()
-    df.fillna(0, inplace=True)
-    return df
 
 
 # Fehlende Spalten ergänzen
@@ -134,8 +115,8 @@ def evaluate_model(model_info, data, actual_data_2022, asset_name, prediction_st
         'Tatsächlicher Preis': actual_prices_2022[:prediction_steps],
         'Vorhergesagter Preis': predictions_inv[:prediction_steps]
     })
-    prediction_df.to_csv('btc_predictions.csv', index=False)
-    print("Vorhersagen und tatsächliche Preise wurden in 'btc_predictions.csv' gespeichert.")
+    prediction_df.to_csv('btc_no_indicators_predictions.csv', index=False)
+    print("Vorhersagen und tatsächliche Preise wurden in 'btc_no_indicators_predictions.csv' gespeichert.")
 
     # Plotten der Vorhersagen und tatsächlichen Preise
     plt.figure(figsize=(14, 7))
@@ -144,9 +125,18 @@ def evaluate_model(model_info, data, actual_data_2022, asset_name, prediction_st
 
     # Buy- und Sell-Signale anzeigen
     if buy_signal is not None and sell_signal is not None:
-        plt.scatter(actual_dates_2022[buy_signal], predictions_inv[buy_signal], marker='^', color='g', label='Buy Signal')
-        plt.scatter(actual_dates_2022[sell_signal], predictions_inv[sell_signal], marker='v', color='r', label='Sell Signal')
-        print(f"Buy am {actual_dates_2022[buy_signal]} für {predictions_inv[buy_signal]:.2f} und Sell am {actual_dates_2022[sell_signal]} für {predictions_inv[sell_signal]:.2f} mit Profit von {profit:.2f}")
+        # Buy- und Sell-Signale basierend auf den vorhergesagten Preisen
+        plt.scatter(actual_dates_2022[buy_signal], predictions_inv[buy_signal], marker='^', color='g',
+                    label='Buy Signal (Vorhergesagt)')
+        plt.scatter(actual_dates_2022[sell_signal], predictions_inv[sell_signal], marker='v', color='r',
+                    label='Sell Signal (Vorhergesagt)')
+
+        # Printen von Buy- und Sell-Daten
+        print(
+            f"Buy am {pd.to_datetime(actual_dates_2022[buy_signal]).date()} für {predictions_inv[buy_signal]:.2f} (Vorhergesagt) und Sell am {pd.to_datetime(actual_dates_2022[sell_signal]).date()} für {predictions_inv[sell_signal]:.2f} mit Profit von {profit:.2f}")
+
+        # Füge den Profit als zusätzlichen Eintrag zur Legende hinzu
+        plt.plot([], [], ' ', label=f'Profit: {profit:.2f}')
 
     # Genauigkeit im Diagramm anzeigen
     plt.text(0.02, 0.95, f"Genauigkeit: {accuracy:.2%}", transform=plt.gca().transAxes, fontsize=12,
@@ -160,17 +150,15 @@ def evaluate_model(model_info, data, actual_data_2022, asset_name, prediction_st
 if __name__ == "__main__":
     # Lade Daten bis Ende 2021
     btc_data = fetch_test_data('BTC-USD', '2010-01-01', '2021-12-31')
-    btc_data_with_indicators = add_technical_indicators(btc_data.copy())
 
     # Lade nur die Daten für 2022 zur Evaluierung (nicht für Vorhersage)
     btc_data_2022 = fetch_test_data('BTC-USD', '2022-01-01', '2022-01-31')
-    btc_data_2022 = add_technical_indicators(btc_data_2022)
+
 
     model_info = {
-        "model_path": "../models/standard_model/btc_standard_model.h5",
-        "scaler_path": "../models/scaler/btc_scaler_with_indicators.pkl",
-        "feature_columns": ['Open', 'High', 'Low', 'Close', 'Volume', 'Fed_Rate', 'Inflation', 'rsi', 'macd',
-                            'macd_signal', 'bb_mavg', 'bb_high', 'bb_low', 'stoch', 'stoch_signal']
+        "model_path": "../../models/no_indicators_model/btc_no_indicators_model.h5",
+        "scaler_path": "../../models/scaler/btc_scaler_no_indicators.pkl",
+        "feature_columns": ['Open', 'High', 'Low', 'Close', 'Volume']
     }
 
-    evaluate_model(model_info, btc_data_with_indicators, btc_data_2022, "Bitcoin", prediction_steps=30)
+    evaluate_model(model_info,btc_data, btc_data_2022, "Bitcoin", prediction_steps=30)
