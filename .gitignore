@@ -173,7 +173,7 @@ src/kaggle.json
 /models/scaler/*
 /models/no_indicators_model/*
 .idea/other.xml
-/data
+/data/*
 Experiment/Experiment_1/btc_predictions.csv
 Experiment/Experiment_1/eth_predictions.csv
 Experiment/Experiment_1/sol_predictions.csv
