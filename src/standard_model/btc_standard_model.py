@@ -2,9 +2,8 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import pickle
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
 from tensorflow.keras.optimizers import Adam
 import tensorflow as tf
@@ -81,34 +80,81 @@ def train_and_save_model(X_train, y_train, X_val, y_val, model_name, output_step
     plt.close()
 
 if __name__ == "__main__":
-    data_directories = [
-        "../../data/btc_with_indicators"
-    ]
-    data_files = []
-    for directory in data_directories:
-        if os.path.exists(directory):
-            data_files.extend([os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.csv')])
+    model_directory = "../../models/standard_model"
+    model_name = "btc_standard_model.h5"
+    model_path = os.path.join(model_directory, model_name)
 
-    if not data_files:
-        raise ValueError("No data found for training.")
+    # Prüfen, ob das Modell bereits existiert
+    if os.path.exists(model_path):
+        user_input = input(f"Model {model_name} already exists. Do you want to retrain it? (y/n): ").strip().lower()
+        if user_input == 'n':
+            print(f"Loading existing model {model_name}...")
+            model = load_model(model_path)
+        else:
+            # Modell neu trainieren
+            data_directories = [
+                "../../data/btc_with_indicators"
+            ]
+            data_files = []
+            for directory in data_directories:
+                if os.path.exists(directory):
+                    data_files.extend([os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.csv')])
 
-    combined_df = pd.concat([pd.read_csv(file, index_col=0) for file in data_files], ignore_index=True)
-    combined_df = combined_df.dropna()
+            if not data_files:
+                raise ValueError("No data found for training.")
 
-    scaler = MinMaxScaler()
-    feature_columns_with_indicators = ['Open', 'High', 'Low', 'Close', 'Volume', 'Fed_Rate', 'Inflation', 'rsi', 'macd',
-                                       'macd_signal', 'bb_mavg', 'bb_high', 'bb_low', 'stoch', 'stoch_signal']
-    close_index = feature_columns_with_indicators.index('Close')
+            combined_df = pd.concat([pd.read_csv(file, index_col=0) for file in data_files], ignore_index=True)
+            combined_df = combined_df.dropna()
 
-    scaled_data = scaler.fit_transform(combined_df[feature_columns_with_indicators])
+            scaler = MinMaxScaler()
+            feature_columns_with_indicators = ['Open', 'High', 'Low', 'Close', 'Volume', 'Fed_Rate', 'Inflation', 'rsi', 'macd',
+                                               'macd_signal', 'bb_mavg', 'bb_high', 'bb_low', 'stoch', 'stoch_signal']
+            close_index = feature_columns_with_indicators.index('Close')
 
-    # Create sequences for multistep forecasting (30 days ahead)
-    X, y = create_sequences(scaled_data, close_index, sequence_length=50, forecast_steps=30)
+            scaled_data = scaler.fit_transform(combined_df[feature_columns_with_indicators])
 
-    split_ratio = 0.8
-    split_index = int(len(X) * split_ratio)
-    X_train, X_val = X[:split_index], X[split_index:]
-    y_train, y_val = y[:split_index], y[split_index:]
+            # Create sequences for multistep forecasting (30 days ahead)
+            X, y = create_sequences(scaled_data, close_index, sequence_length=50, forecast_steps=30)
 
-    # Train and save the model for 30 days prediction
-    train_and_save_model(X_train, y_train, X_val, y_val, model_name="btc_standard_model", output_steps=30)
+            split_ratio = 0.8
+            split_index = int(len(X) * split_ratio)
+            X_train, X_val = X[:split_index], X[split_index:]
+            y_train, y_val = y[:split_index], y[split_index:]
+
+            # Train and save the model for 30 days prediction
+            train_and_save_model(X_train, y_train, X_val, y_val, model_name="btc_standard_model", output_steps=30)
+
+    else:
+        # Modell existiert nicht, neues Training wird durchgeführt
+        print(f"No existing model found. Training a new model {model_name}...")
+        data_directories = [
+            "../../data/btc_with_indicators"
+        ]
+        data_files = []
+        for directory in data_directories:
+            if os.path.exists(directory):
+                data_files.extend([os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.csv')])
+
+        if not data_files:
+            raise ValueError("No data found for training.")
+
+        combined_df = pd.concat([pd.read_csv(file, index_col=0) for file in data_files], ignore_index=True)
+        combined_df = combined_df.dropna()
+
+        scaler = MinMaxScaler()
+        feature_columns_with_indicators = ['Open', 'High', 'Low', 'Close', 'Volume', 'Fed_Rate', 'Inflation', 'rsi', 'macd',
+                                           'macd_signal', 'bb_mavg', 'bb_high', 'bb_low', 'stoch', 'stoch_signal']
+        close_index = feature_columns_with_indicators.index('Close')
+
+        scaled_data = scaler.fit_transform(combined_df[feature_columns_with_indicators])
+
+        # Create sequences for multistep forecasting (30 days ahead)
+        X, y = create_sequences(scaled_data, close_index, sequence_length=50, forecast_steps=30)
+
+        split_ratio = 0.8
+        split_index = int(len(X) * split_ratio)
+        X_train, X_val = X[:split_index], X[split_index:]
+        y_train, y_val = y[:split_index], y[split_index:]
+
+        # Train and save the model for 30 days prediction
+        train_and_save_model(X_train, y_train, X_val, y_val, model_name="btc_standard_model", output_steps=30)
