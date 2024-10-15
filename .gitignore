@@ -169,7 +169,9 @@ cython_debug/
 
 src/kaggle.json
 
-/models/*
+/models/standard_model
+/models/scaler
+/models/no_indicators_model
 .idea/other.xml
 /data
 Experiment/Experiment_1/btc_predictions.csv
