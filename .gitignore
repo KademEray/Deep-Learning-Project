@@ -207,3 +207,6 @@ models/small_model/eth_small_model.h5
 models/small_model/eth_small_model_training_loss.png
 models/small_model/sol_small_model.h5
 models/small_model/sol_small_model_training_loss.png
+Experiment/Experiment_6/btc_predictions_monte_carlo.csv
+Experiment/Experiment_6/eth_predictions.csv
+Experiment/Experiment_6/sol_predictions.csv
