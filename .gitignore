@@ -161,53 +161,10 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-/data/processed_data/*
-/data/raw_data/*
-!/data/raw_data/.gitkeep
-!/data/processed_data/.gitkeep
+
 .idea/dictionaries/eray5.xml
 
 src/kaggle.json
 
-/models/standard_model/*
-/models/scaler/*
-/models/no_indicators_model/*
-.idea/other.xml
-/data/*
-Experiment/Experiment_1/btc_predictions.csv
-Experiment/Experiment_1/eth_predictions.csv
-Experiment/Experiment_1/sol_predictions.csv
-Experiment/Experiment_2/btc_no_indicators_predictions.csv
-Experiment/Experiment_2/eth_no_indicators_predictions.csv
-Experiment/Experiment_2/sol_no_indicators_predictions.csv
-Experiment/Experiment_3/btc_predictions.csv
-Experiment/Experiment_3/eth_predictions.csv
-Experiment/Experiment_3/sol_predictions.csv
-Experiment/Experiment_4/btc_predictions.csv
-Experiment/Experiment_4/eth_predictions.csv
-Experiment/Experiment_4/sol_predictions.csv
-Experiment/Experiment_5/btc_predictions.csv
-Experiment/Experiment_5/eth_predictions.csv
-Experiment/Experiment_5/sol_predictions.csv
-models/extreme_model/btc_extreme_model.h5
-models/extreme_model/btc_extreme_model_training_loss.png
-models/extreme_model/eth_extreme_model.h5
-models/extreme_model/eth_extreme_model_training_loss.png
-models/extreme_model/sol_extreme_model.h5
-models/extreme_model/sol_extreme_model_training_loss.png
-models/sgd_model/btc_sgd_model.h5
-models/sgd_model/btc_sgd_model_training_loss.png
-models/sgd_model/eth_sgd_model.h5
-models/sgd_model/eth_sgd_model_training_loss.png
-models/sgd_model/sol_sgd_model.h5
-models/sgd_model/sol_sgd_model_training_loss.png
-models/small_model/btc_small_model.h5
-models/small_model/btc_small_model_training_loss.png
-models/small_model/eth_small_model.h5
-models/small_model/eth_small_model_training_loss.png
-models/small_model/sol_small_model.h5
-models/small_model/sol_small_model_training_loss.png
-Experiment/Experiment_6/btc_predictions_monte_carlo.csv
-Experiment/Experiment_6/eth_predictions.csv
-Experiment/Experiment_6/sol_predictions.csv
+
 /.idea
