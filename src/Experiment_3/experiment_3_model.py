@@ -14,17 +14,14 @@ from torch.cuda.amp import GradScaler
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class ThreeGroupLSTMModel(nn.Module):
-    def __init__(self, seq_length, hidden_dim, num_layers=3, dropout=0.3):
-        super(ThreeGroupLSTMModel, self).__init__()
+class DynamicLSTMModel(nn.Module):
+    def __init__(self, seq_length, hidden_dim, input_sizes, num_layers=3, dropout=0.3):
+        super(DynamicLSTMModel, self).__init__()
         self.hidden_dim = hidden_dim
 
-        # Custom LSTM für die Hauptdatenquelle Y mit einer Eingabedimension von 10
-        self.Y_layer = CustomLSTM(10, hidden_dim, num_layers=num_layers, dropout=dropout)
-
-        # Angepasste Eingabedimensionen für die LSTMs der Gruppen X1 und X2
-        self.X1_layer = CustomLSTM(9, hidden_dim, num_layers=num_layers, dropout=dropout)
-        self.X2_layer = CustomLSTM(9, hidden_dim, num_layers=num_layers, dropout=dropout)
+        # Erstelle dynamische LSTM-Schichten für jede Eingabedimension
+        self.lstm_layers = nn.ModuleList([CustomLSTM(input_size, hidden_dim, num_layers=num_layers, dropout=dropout)
+                                          for input_size in input_sizes])
 
         # Multi-Input LSTM und Attention
         self.multi_input_lstm = MultiInputLSTMWithGates(hidden_dim, hidden_dim, num_layers=num_layers, dropout=dropout)
@@ -37,18 +34,19 @@ class ThreeGroupLSTMModel(nn.Module):
             nn.Linear(hidden_dim, 10)  # Endausgabe für 10 Features
         )
 
-    def forward(self, Y, X1, X2):
-        # Verarbeitung des Hauptsignals Y
-        Y_tilde, _ = self.Y_layer(Y)
+    def forward(self, *inputs):
+        # Sicherstellen, dass die Eingabegrößen die LSTM-Schichten korrekt füttern
+        outputs = [lstm_layer(input_data) for lstm_layer, input_data in zip(self.lstm_layers, inputs)]
 
-        # Gated Signal
-        self_gate = torch.sigmoid(self.dual_attention_layer(Y_tilde))
+        # Extrahiere das gelernte Signal aus jedem LSTM und füge es zusammen
+        processed_signals = [output[0] for output in outputs]
 
-        X1_tilde, _ = self.X1_layer(X1)
-        X2_tilde, _ = self.X2_layer(X2)
+        # Berechne self_gate und übergebe es zusammen mit den anderen Eingaben an MultiInputLSTMWithGates
+        self_gate = torch.sigmoid(self.dual_attention_layer(processed_signals[0]))  # Beispielhaft aus den verarbeiteten Signalen
+        Index = processed_signals[1]  # Beispielweise ein weiteres Signal
 
         # Multi-Input LSTM zur Fusion
-        combined_input, _ = self.multi_input_lstm(Y_tilde, X1_tilde, X2_tilde, Y_tilde, self_gate)
+        combined_input, _ = self.multi_input_lstm(*processed_signals, Index, self_gate)
 
         # Attention und finale Transformation für jeden Zeitschritt
         attended = self.dual_attention_layer(combined_input)
@@ -59,14 +57,16 @@ class ThreeGroupLSTMModel(nn.Module):
         return output
 
 
-def train_group_model(group_name, X_samples, Y_samples, seq_length, hidden_dim, batch_size, learning_rate, epochs,
-                      model_dir):
+def train_group_model(group_name, X_samples, Y_samples, seq_length, hidden_dim, batch_size, learning_rate, epochs, model_dir):
     """
-    Trainiert ein ThreeGroupLSTMModel für eine spezifische Gruppe von Daten (z.B., Standard, Indicators_Group_1).
+    Trainiert ein DynamicLSTMModel für eine spezifische Gruppe von Daten (z.B., Standard, Indicators_Group_1).
     Das Modell wird für eine Anzahl von Epochen mit dem Mean Squared Error (MSE) als Verlustfunktion und Adam als Optimierer trainiert.
     """
+    # Bestimme die Eingabedimensionen für jede Gruppe
+    input_sizes = [X.shape[2] for X in [X_samples]]  # Hier werden alle Gruppen mit ihren Dimensionen berücksichtigt
+
     # Initialisiere das Modell für die spezifische Gruppe und bewege es auf das Gerät (GPU, wenn verfügbar)
-    model = ThreeGroupLSTMModel(seq_length, hidden_dim).to(device)
+    model = DynamicLSTMModel(seq_length, hidden_dim, input_sizes).to(device)
 
     # Konvertiere X_samples und Y_samples in Tensors, falls sie es nicht sind, und verschiebe sie auf das richtige Gerät
     if not isinstance(X_samples, torch.Tensor):
@@ -97,7 +97,7 @@ def train_group_model(group_name, X_samples, Y_samples, seq_length, hidden_dim, 
             optimizer.zero_grad()  # Setze die Gradienten des Optimierers auf Null
 
             # Vorhersage durchführen
-            output = model(X, X, X)
+            output = model(X, X, X)  # Passen Sie die Eingaben je nach Gruppe an
 
             # Berechne den Verlust und führe Backpropagation durch
             loss = criterion(output, y)
@@ -119,16 +119,19 @@ def train_group_model(group_name, X_samples, Y_samples, seq_length, hidden_dim, 
 
 
 class FusionModel(nn.Module):
-    def __init__(self, hidden_dim=64, seq_length=30, output_features=10):
+    def __init__(self, hidden_dim=64, seq_length=30, output_features=10, group_features=None):
         super(FusionModel, self).__init__()
         self.hidden_dim = hidden_dim
         self.seq_length = seq_length
         self.output_features = output_features
 
-        # Initialisiert drei ThreeGroupLSTMModel-Instanzen für die jeweiligen Gruppen
-        self.standard_model = ThreeGroupLSTMModel(seq_length, hidden_dim)  # Modell für die Standard-Gruppe
-        self.indicators_1_model = ThreeGroupLSTMModel(seq_length, hidden_dim)  # Modell für Indicators_Group_1
-        self.indicators_2_model = ThreeGroupLSTMModel(seq_length, hidden_dim)  # Modell für Indicators_Group_2
+        # Bestimme die Eingabedimensionen für jede Gruppe
+        input_sizes = [len(group_features[group_name]) for group_name in group_features]
+
+        # Initialisiert drei DynamicLSTMModel-Instanzen für die jeweiligen Gruppen
+        self.standard_model = DynamicLSTMModel(seq_length, hidden_dim, input_sizes).to(device)
+        self.indicators_1_model = DynamicLSTMModel(seq_length, hidden_dim, input_sizes).to(device)
+        self.indicators_2_model = DynamicLSTMModel(seq_length, hidden_dim, input_sizes).to(device)
 
         # Definiert eine Fully Connected-Schicht für die finale Fusion
         self.fusion_fc = nn.Sequential(
@@ -160,14 +163,14 @@ class FusionModel(nn.Module):
         return output  # Gibt eine Ausgabe in der Form [Batch, Seq, Features]
 
 
-def train_fusion_model(X_standard, X_group1, X_group2, Y_samples, hidden_dim, batch_size, learning_rate, epochs,
-                       model_dir):
-    model = FusionModel(hidden_dim, seq_length=50, output_features=10).to(device)
+def train_fusion_model(X_standard, X_group1, X_group2, Y_samples, hidden_dim, batch_size, learning_rate, epochs, model_dir):
+    input_sizes = [X_standard.shape[2], X_group1.shape[2], X_group2.shape[2]]  # Dynamische Bestimmung der Eingabedimensionen
+
+    model = DynamicLSTMModel(seq_length=50, hidden_dim=hidden_dim, input_sizes=input_sizes).to(device)
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     dataset = torch.utils.data.TensorDataset(X_standard, X_group1, X_group2, Y_samples)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
-    scaler = torch.amp.GradScaler()
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     model.train()
     for epoch in range(epochs):
@@ -182,16 +185,14 @@ def train_fusion_model(X_standard, X_group1, X_group2, Y_samples, hidden_dim, ba
 
             optimizer.zero_grad()
 
-            with torch.amp.autocast(device_type='cuda'):
-                output = model(X_standard, X_group1, X_group2)
+            output = model(X_standard, X_group1, X_group2)
 
-                # Verwende nur die letzten 30 Zeitschritte in der Loss-Berechnung
-                output = output[:, -30:, :]  # Ausgabe auf 30 Zeitschritte beschränken
-                loss = criterion(output, y)
+            # Verwende nur die letzten 30 Zeitschritte in der Loss-Berechnung
+            output = output[:, -30:, :]
+            loss = criterion(output, y)
 
-            scaler.scale(loss).backward()  # Gradient scaling
-            scaler.step(optimizer)
-            scaler.update()
+            loss.backward()
+            optimizer.step()
 
             running_loss += loss.item()
 
@@ -222,8 +223,8 @@ if __name__ == '__main__':
     torch.backends.cudnn.benchmark = False
 
     # Definiert die Verzeichnisse für gespeicherte und trainierte Daten
-    samples_dir = "./Data/Samples/"  # Verzeichnis mit den vorbereiteten Trainingssequenzen
-    model_dir = "./Data/Models/"  # Verzeichnis zum Speichern des trainierten Modells
+    samples_dir = "./Data/Samples"  # Verzeichnis mit den vorbereiteten Trainingssequenzen
+    model_dir = "./Data/Models"  # Verzeichnis zum Speichern des trainierten Modells
 
     # Wichtige Modell- und Trainingsparameter
     seq_length = 50  # Länge der Eingabesequenzen in Tagen

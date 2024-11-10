@@ -84,6 +84,35 @@ group_features = {
     'Indicators_Group_2': ['cci', 'roc', 'bb_upper', 'bb_lower', 'sma20', 'ema50', 'upperband', 'lowerband', 'obv']
 }
 
+
+# Funktion zum Laden des Modells mit passenden Parametern
+def load_model_with_matching_keys(model, model_path):
+    # Laden des gespeicherten state_dict
+    saved_state_dict = torch.load(model_path)
+
+    # Das aktuelle state_dict des Modells
+    model_state_dict = model.state_dict()
+
+    # Neue state_dict für das Modell, bei dem nur die passenden Parameter geladen werden
+    new_state_dict = {}
+
+    # Vergleiche und kopiere nur passende Gewichtungen
+    for name, param in saved_state_dict.items():
+        if name in model_state_dict:
+            # Falls der Name in beiden state_dicts übereinstimmt, wird der Parameter zugewiesen
+            new_state_dict[name] = param
+        else:
+            print(f"Überschüssiger Parameter: {name} wird ignoriert.")
+
+    # Aktualisiere das Modell mit dem neuen state_dict
+    model_state_dict.update(new_state_dict)
+
+    # Lade das neue state_dict ins Modell
+    model.load_state_dict(model_state_dict)
+
+    return model
+
+
 # Hauptskript zur Ausführung der Vorhersage
 if __name__ == "__main__":
     models_dir = "./Data/Models/"
@@ -115,8 +144,10 @@ if __name__ == "__main__":
 
     # Lade das Modell
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = FusionModel(hidden_dim=hidden_dim, seq_length=seq_length).to(device)
-    model.load_state_dict(torch.load(model_path, weights_only=True))
+    model = FusionModel(hidden_dim=hidden_dim, seq_length=seq_length, group_features=group_features).to(device)
+
+    # Modell mit dem angepassten state_dict laden
+    model = load_model_with_matching_keys(model, model_path)
     model.eval()
 
     # Bereite die Eingabedaten für das Modell vor
