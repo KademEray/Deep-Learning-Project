@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import pickle
 import torch
 import torch.nn.functional as F
-from src.Experiment_2.experiment_2_model import FusionModel
+from src.Experiment_3.experiment_3_model import FusionModel
 import talib as ta
 
 
