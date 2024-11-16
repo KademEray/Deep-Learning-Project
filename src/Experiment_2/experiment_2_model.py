@@ -208,14 +208,14 @@ def train_fusion_model(X_standard, X_group1, X_group2, Y_samples, hidden_dim, ba
 if __name__ == '__main__':
 
     # Setzen der Zufallszahlenseeds für Python, NumPy und PyTorch
-    random.seed(42)
-    np.random.seed(42)
-    torch.manual_seed(42)
+    random.seed(1)
+    np.random.seed(1)
+    torch.manual_seed(1)
 
     # Falls Sie CUDA verwenden, setzen Sie auch den Seed für CUDA
     if torch.cuda.is_available():
-        torch.cuda.manual_seed(42)
-        torch.cuda.manual_seed_all(42)  # Für Multi-GPU, falls verwendet
+        torch.cuda.manual_seed(1)
+        torch.cuda.manual_seed_all(1)  # Für Multi-GPU, falls verwendet
 
     # Zusätzliche Einstellungen, um deterministisches Verhalten sicherzustellen
     torch.backends.cudnn.deterministic = True

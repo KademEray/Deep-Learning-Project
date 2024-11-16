@@ -13,7 +13,6 @@ import torch.nn.functional as F
 from src.Experiment_2.experiment_2_model import FusionModel
 import talib as ta
 
-
 # Funktionen zur Berechnung technischer Indikatoren
 def calculate_indicators(df):
     df = df.copy()
@@ -30,23 +29,18 @@ def calculate_indicators(df):
     df['bb_upper'] = bb.bollinger_hband()
     df['bb_lower'] = bb.bollinger_lband()
 
-    # Zusätzliche Indikatoren mit TA-Lib für Gruppe 1 und 2
-    # Für Gruppe 1
+    # Zusätzliche Indikatoren mit TA-Lib
     df['adx'] = ta.ADX(df['High'], df['Low'], df['Close'], timeperiod=14)
     df['willr'] = ta.WILLR(df['High'], df['Low'], df['Close'], timeperiod=14)
     df['cci20'] = ta.CCI(df['High'], df['Low'], df['Close'], timeperiod=20)
     df['mfi'] = ta.MFI(df['High'], df['Low'], df['Close'], df['Volume'], timeperiod=14)
-
-    # Für Gruppe 2
     df['sma20'] = ta.SMA(df['Close'], timeperiod=20)
     df['ema50'] = ta.EMA(df['Close'], timeperiod=50)
-    df['upperband'], df['middleband'], df['lowerband'] = ta.BBANDS(df['Close'], timeperiod=20, nbdevup=2, nbdevdn=2,
-                                                                   matype=0)
+    df['upperband'], df['middleband'], df['lowerband'] = ta.BBANDS(df['Close'], timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
     df['obv'] = ta.OBV(df['Close'], df['Volume'])
 
     df = df.dropna()
     return df
-
 
 # Funktion zum Laden der Testdaten
 def load_test_data(symbol, end_date):
@@ -55,17 +49,16 @@ def load_test_data(symbol, end_date):
     test_df.reset_index(inplace=True)
     test_df = test_df[['Open', 'High', 'Low', 'Close', 'Volume']]
     indicators = calculate_indicators(test_df)
-    test_df = test_df.rename(columns={'Close': 'Adj Close'})
-    test_df['Close'] = test_df['Adj Close']
+    test_df = test_df.rename(columns={'Close': 'Adj Close'})  # 'Adj Close' aus 'Close' erstellen
+    test_df['Close'] = test_df['Adj Close']  # Sicherstellen, dass 'Close' vorhanden bleibt
     test_data = pd.concat([test_df[['Open', 'High', 'Low', 'Adj Close', 'Volume', 'Close']], indicators], axis=1)
     test_data = test_data.loc[:, ~test_data.columns.duplicated()].dropna()
     return test_data
 
-
 # Funktion zur Vorbereitung der Testsequenzen
 def prepare_test_sequences(test_data, scaler, group_features):
     expected_features = scaler.feature_names_in_
-    test_data = test_data.reindex(columns=expected_features)
+    test_data = test_data.reindex(columns=expected_features)  # Spaltenreihenfolge anpassen
     scaled_data = scaler.transform(test_data)
     scaled_df = pd.DataFrame(scaled_data, columns=expected_features)
 
@@ -75,7 +68,6 @@ def prepare_test_sequences(test_data, scaler, group_features):
         sequence = group_data.values[-seq_length:]
         sequences[group_name] = torch.tensor(sequence).unsqueeze(0).float()
     return sequences
-
 
 # Definiere die Feature-Gruppen
 group_features = {
@@ -90,24 +82,21 @@ if __name__ == "__main__":
     model_path = os.path.join(models_dir, "fusion_model_final.pth")
     scaler_path = os.path.join(models_dir, "scaler.pkl")
 
-    # Vorhersagedatum und Symbole
+    # Setze Vorhersage- und Analysezeiträume
     forecast_date = "2023-03-02"
     seq_length = 50
     hidden_dim = 64
     crypto_symbol = "BTC-USD"
 
-    # Setze das Startdatum auf 30 Tage vor dem Vorhersagedatum
-    start_date = (pd.to_datetime(forecast_date) - pd.DateOffset(days=30)).strftime('%Y-%m-%d')
-
     # Lade den Scaler und initialisiere einen neuen Scaler nur für das `Close`-Feature
     with open(scaler_path, 'rb') as f:
         scaler = pickle.load(f)
-    close_scaler = StandardScaler()  # Erstellen des Close-Scalers
+    close_scaler = StandardScaler()
 
     # Lade und bereite die Testdaten vor
     try:
-        test_data = load_test_data(crypto_symbol, forecast_date)
-        close_scaler.fit(test_data[['Close']])  # Trainieren des Close-Scalers nur auf dem Close-Preis
+        test_data = load_test_data(crypto_symbol, "2023-02-01")
+        close_scaler.fit(test_data[['Close']])  # Nur den Close-Wert skalieren
         test_sequences = prepare_test_sequences(test_data, scaler, group_features)
     except Exception as e:
         print(f"Fehler beim Laden oder Vorbereiten der Testdaten: {e}")
@@ -127,26 +116,20 @@ if __name__ == "__main__":
     # Vorhersage durchführen
     with torch.no_grad():
         output = model(X_standard, X_group1, X_group2)
-
-        # Verwende nur das `Close`-Feature für die Rückskalierung
         close_index = list(scaler.feature_names_in_).index('Close')
         predicted_price_scaled = output[0, -1, close_index].item()
-
-        # Rückskalierung mit dem `close_scaler`
         predicted_price = close_scaler.inverse_transform([[predicted_price_scaled]])[0, 0]
 
-    # Tatsächlicher Preis am Startdatum und Vorhersagedatum abrufen
+    # Tatsächlicher Preis am Kaufdatum (1. März 2023) und Verkaufsdatum (30. März 2023)
     try:
-        actual_start_price_df = yf.download(crypto_symbol, start=start_date,
-                                            end=pd.to_datetime(start_date) + pd.DateOffset(days=1))
+        actual_start_price_df = yf.download(crypto_symbol, start="2023-02-01", end="2023-02-02")
         if actual_start_price_df.empty:
-            raise ValueError(f"Keine Daten für den Startpreis am {start_date} verfügbar.")
+            raise ValueError("Keine Daten für den Startpreis verfügbar.")
         actual_start_price = actual_start_price_df['Close'].iloc[0]
 
-        actual_end_price_df = yf.download(crypto_symbol, start=forecast_date,
-                                          end=pd.to_datetime(forecast_date) + pd.DateOffset(days=1))
+        actual_end_price_df = yf.download(crypto_symbol, start="2023-03-02", end="2023-03-03")
         if actual_end_price_df.empty:
-            raise ValueError(f"Keine Daten für den Endpreis am {forecast_date} verfügbar.")
+            raise ValueError("Keine Daten für den Endpreis verfügbar.")
         actual_end_price = actual_end_price_df['Close'].iloc[0]
     except Exception as e:
         print(f"Fehler beim Abrufen der tatsächlichen Preisdaten: {e}")
@@ -165,8 +148,8 @@ if __name__ == "__main__":
     percent_error = (absolute_error / actual_end_price) * 100
 
     # Ergebnisse anzeigen
-    print(f"Kaufpreis am {start_date}: {actual_start_price}")
-    print(f"Tatsächlicher Preis am {forecast_date}: {actual_end_price}")
+    print(f"Kaufpreis am 01.02.2023: {actual_start_price}")
+    print(f"Tatsächlicher Preis am 02.03.2023: {actual_end_price}")
     print(f"Vorhergesagter Preis: {predicted_price}")
     print(f"Tatsächlicher Gewinn: {actual_gain}")
     print(f"Vorhergesagter Gewinn: {predicted_gain}")
@@ -177,15 +160,16 @@ if __name__ == "__main__":
 
     # Kursverlauf und Vorhersage-Plot
     try:
-        start_plot_date = (pd.to_datetime(forecast_date) - pd.DateOffset(days=30)).strftime('%Y-%m-%d')
-        historical_prices = \
-            yf.download(crypto_symbol, start=start_plot_date,
-                        end=pd.to_datetime(forecast_date) + pd.DateOffset(days=1))['Close']
+        start_plot_date = (pd.to_datetime("2023-02-01") - pd.DateOffset(days=seq_length)).strftime('%Y-%m-%d')
+        historical_prices = yf.download(crypto_symbol, start=start_plot_date, end="2023-03-03")['Close']
 
         plt.figure(figsize=(10, 6))
         plt.plot(historical_prices.index, historical_prices.values, label='Tatsächlicher Preisverlauf', color='blue')
-        plt.scatter(pd.to_datetime(forecast_date), predicted_price, color='red', label='Vorhergesagter Preis', zorder=5)
-        plt.title(f"Kursverlauf von {crypto_symbol} mit Vorhersage am {forecast_date}")
+        plt.scatter(pd.to_datetime("2023-03-02"), predicted_price, color='red',
+                    label='Vorhergesagter Preis am 02.03.2023', zorder=5)
+        plt.scatter(pd.to_datetime("2023-02-01"), actual_start_price, color='green', label='Kaufpreis am 01.02.2023',
+                    zorder=5)
+        plt.title(f"Kursverlauf von {crypto_symbol} mit Vorhersage am 02.03.2023")
         plt.xlabel("Datum")
         plt.ylabel("Preis in USD")
         plt.legend()

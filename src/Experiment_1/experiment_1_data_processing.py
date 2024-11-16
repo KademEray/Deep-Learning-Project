@@ -56,7 +56,7 @@ if __name__ == "__main__":
     os.makedirs(samples_dir, exist_ok=True)
 
     crypto_symbol = "BTC-USD"
-    start_date, end_date = "2010-01-01", "2023-1-31"
+    start_date, end_date = "2010-01-01", "2023-01-31"
 
     df = yf.download(crypto_symbol, start=start_date, end=end_date, progress=False)
     df.reset_index(inplace=True)
