@@ -11,7 +11,21 @@ from sklearn.preprocessing import StandardScaler
 from ta.momentum import RSIIndicator, ROCIndicator, StochasticOscillator
 from ta.trend import MACD, CCIIndicator
 from ta.volatility import BollingerBands
+import random
 
+# Setzen der Zufallszahlenseeds für Python, NumPy und PyTorch
+random.seed(1)
+np.random.seed(1)
+torch.manual_seed(1)
+
+# Falls CUDA verwendet wird, den Seed auch für CUDA setzen
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(1)
+    torch.cuda.manual_seed_all(1)  # Für Multi-GPU, falls verwendet
+
+# Zusätzliche Einstellungen, um deterministisches Verhalten sicherzustellen
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 # Prüfen, ob CUDA verfügbar ist, und das Gerät auswählen
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

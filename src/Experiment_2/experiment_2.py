@@ -12,6 +12,21 @@ import torch
 import torch.nn.functional as F
 from src.Experiment_2.experiment_2_model import FusionModel
 import talib as ta
+import random
+
+# Setzen der Zufallszahlenseeds für Python, NumPy und PyTorch
+random.seed(1)
+np.random.seed(1)
+torch.manual_seed(1)
+
+# Falls CUDA verwendet wird, den Seed auch für CUDA setzen
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(1)
+    torch.cuda.manual_seed_all(1)  # Für Multi-GPU, falls verwendet
+
+# Zusätzliche Einstellungen, um deterministisches Verhalten sicherzustellen
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 # Funktionen zur Berechnung technischer Indikatoren
 def calculate_indicators(df):
@@ -156,7 +171,7 @@ if __name__ == "__main__":
     print(f"MSE im Preis: {mse_price_error}")
     print(f"RMSE im Preis: {rmse_price_error}")
     print(f"Absoluter Fehler: {absolute_error}")
-    print(f"Prozentualer Fehler: {percent_error:.2f}%")
+    print(f"Prozentualer Fehler: {percent_error:.4f}%")
 
     # Kursverlauf und Vorhersage-Plot
     try:

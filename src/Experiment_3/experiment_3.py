@@ -12,6 +12,21 @@ import torch
 import torch.nn.functional as F
 from src.Experiment_3.experiment_3_model import FusionModel
 import talib as ta
+import random
+
+# Setzen der Zufallszahlenseeds für Python, NumPy und PyTorch
+random.seed(1)
+np.random.seed(1)
+torch.manual_seed(1)
+
+# Falls CUDA verwendet wird, den Seed auch für CUDA setzen
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(1)
+    torch.cuda.manual_seed_all(1)  # Für Multi-GPU, falls verwendet
+
+# Zusätzliche Einstellungen, um deterministisches Verhalten sicherzustellen
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 
 # Funktionen zur Berechnung technischer Indikatoren
@@ -199,7 +214,7 @@ if __name__ == "__main__":
     print(f"MSE im Preis: {mse_price_error}")
     print(f"RMSE im Preis: {rmse_price_error}")
     print(f"Absoluter Fehler: {absolute_error}")
-    print(f"Prozentualer Fehler: {percent_error:.2f}%")
+    print(f"Prozentualer Fehler: {percent_error:.6f}%")
 
     # Kursverlauf und Vorhersage-Plot
     try:
@@ -210,6 +225,8 @@ if __name__ == "__main__":
         plt.figure(figsize=(10, 6))
         plt.plot(historical_prices.index, historical_prices.values, label='Tatsächlicher Preisverlauf', color='blue')
         plt.scatter(pd.to_datetime(forecast_date), predicted_price, color='red', label='Vorhergesagter Preis', zorder=5)
+        plt.scatter(pd.to_datetime("2023-02-01"), actual_start_price, color='green', label='Kaufpreis am 1. Februar',
+                    zorder=5)
         plt.title(f"Kursverlauf von {crypto_symbol} mit Vorhersage am {forecast_date}")
         plt.xlabel("Datum")
         plt.ylabel("Preis in USD")
