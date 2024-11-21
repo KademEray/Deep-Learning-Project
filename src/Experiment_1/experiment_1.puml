@@ -1,0 +1,61 @@
+@startuml
+start
+:Starte Skript;
+:Lade historische Daten mit yfinance;
+:Bereinige Daten:
+  - Entferne Duplikate
+  - Interpoliere fehlende Werte;
+:Berechne technische Indikatoren mit calculate_indicators;
+:Kombiniere ursprüngliche Daten mit berechneten Indikatoren;
+:Entferne fehlende Werte (NaN);
+:Skaliere numerische Daten mit StandardScaler;
+:Erstelle finalen DataFrame aus skalierten Daten;
+:Definiere Feature-Gruppen:
+  - Standard (Basisdaten)
+  - Momentum-Indikatoren
+  - Volatilität-Indikatoren;
+:Erstelle Gruppen-Dictionary zur Strukturierung der Feature-Sets;
+:Generiere Sequenzen (Länge 50) für jede Gruppe mit generate_sequences;
+:Speichere generierte Sequenzen als .pkl-Dateien;
+:Speichere den StandardScaler als scaler.pkl;
+
+:Lade Trainingssequenzen (.pkl-Dateien);
+:Initialisiere Modelle:
+  - ThreeGroupLSTMModel für Standard-Features
+  - ThreeGroupLSTMModel für Momentum-Indikatoren
+  - ThreeGroupLSTMModel für Volatilität-Indikatoren;
+:Fusioniere Modelle zu einem FusionModel;
+
+:Starte Training des FusionModels;
+repeat
+    :Lade Batch-Daten aus DataLoader;
+    :Führe Vorwärtsdurchlauf (forward) aus:
+      - Standard-Gruppe durch ThreeGroupLSTMModel
+      - Momentum-Gruppe durch ThreeGroupLSTMModel
+      - Volatilität-Gruppe durch ThreeGroupLSTMModel
+      - Fusioniere Ausgaben im FusionModel;
+    :Berechne Verlust mit MSELoss;
+    :Führe Rückwärtsdurchlauf (backward) durch:
+      - Berechne Gradienten mit autograd
+      - Skaliere Gradienten mit GradScaler;
+    :Aktualisiere Modellgewichte mit Adam-Optimizer;
+    :Logge aktuellen Verlust (running_loss);
+repeat while (Epochen < max_epochs)
+:Speichere trainiertes Modell als fusion_model_final.pth;
+
+:Lade gespeicherten Scaler und FusionModel;
+:Lade und bereite Testdaten vor:
+  - Lade aktuelle Preisdaten mit yfinance
+  - Berechne Indikatoren
+  - Kombiniere Daten und skaliere sie
+  - Generiere Testsequenzen;
+:Führe Vorhersagen mit FusionModel durch;
+:Transformiere Vorhersagen in Originalskala (Inverse Transformation);
+:Vergleiche Vorhersagen mit tatsächlichen Preisen;
+:Berechne Fehlermaße:
+  - MSE
+  - RMSE
+  - MAE;
+:Visualisiere Vorhersagen mit Matplotlib;
+stop
+@enduml
