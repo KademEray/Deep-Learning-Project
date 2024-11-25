@@ -161,6 +161,13 @@ if __name__ == "__main__":
     # Berechne absoluten und prozentualen Fehler
     absolute_error = abs(predicted_price - actual_end_price)
     percent_error = (absolute_error / actual_end_price) * 100
+    # Berechne den Durchschnitt der tatsächlichen Zielwerte
+    mean_actual = torch.tensor([actual_start_price + actual_end_price]).mean()
+    # Berechne SS_total und SS_residual korrekt
+    ss_total = ((torch.tensor([actual_end_price]) - mean_actual) ** 2).sum().item()
+    ss_residual = ((torch.tensor([actual_end_price]) - torch.tensor([predicted_price])) ** 2).sum().item()
+    # R^2 berechnen
+    r2_score = 1 - (ss_residual / ss_total)
 
     # Ergebnisse anzeigen
     print(f"Kaufpreis am 01.02.2023: {actual_start_price}")
@@ -170,6 +177,7 @@ if __name__ == "__main__":
     print(f"Vorhergesagter Gewinn: {predicted_gain}")
     print(f"MSE im Preis: {mse_price_error}")
     print(f"RMSE im Preis: {rmse_price_error}")
+    print(f"R² (Bestimmtheitsmaß): {r2_score:.4f}")
     print(f"Absoluter Fehler: {absolute_error}")
     print(f"Prozentualer Fehler: {percent_error:.4f}%")
 

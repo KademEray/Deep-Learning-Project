@@ -177,9 +177,9 @@ if __name__ == "__main__":
     print(f"Vorhergesagter Gewinn: {predicted_gain}")
     print(f"MSE im Preis: {mse_price_error}")
     print(f"RMSE im Preis: {rmse_price_error}")
+    print(f"R² (Bestimmtheitsmaß): {r2_score:.4f}")
     print(f"Absoluter Fehler: {absolute_error}")
     print(f"Prozentualer Fehler: {percent_error:.4f}%")
-    print(f"R² (Bestimmtheitsmaß): {r2_score:.4f}")
 
     # Plot des Kursverlaufs
     try:

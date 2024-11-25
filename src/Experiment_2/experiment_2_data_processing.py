@@ -95,8 +95,7 @@ if __name__ == "__main__":
 
     # Berechnung der Indikatoren und Kombination mit Standard-Features
     indicators = calculate_indicators(df)
-    df = pd.concat([df[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']], indicators], axis=1).dropna()
-    print(f"Debug: {crypto_symbol} dataset size after indicators: {df.shape}")
+    df = pd.concat([df[['Date']], indicators], axis=1).dropna()
 
     # Skalierung der Daten
     scaler = StandardScaler()

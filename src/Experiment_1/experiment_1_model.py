@@ -20,14 +20,16 @@ class ThreeGroupLSTMModel(nn.Module):
         super(ThreeGroupLSTMModel, self).__init__()
         self.hidden_dim = hidden_dim
 
-        self.Y_layer = CustomLSTM(10, hidden_dim, num_layers=num_layers, dropout=dropout)
+        # Anpassung: Standard-Features Dimension von 10 auf 5 reduziert
+        self.Y_layer = CustomLSTM(5, hidden_dim, num_layers=num_layers, dropout=dropout)
         self.X1_layer = CustomLSTM(5, hidden_dim, num_layers=num_layers, dropout=dropout)
         self.X2_layer = CustomLSTM(4, hidden_dim, num_layers=num_layers, dropout=dropout)
 
         self.multi_input_lstm = MultiInputLSTMWithGates(hidden_dim, hidden_dim, num_layers=num_layers, dropout=dropout)
         self.dual_attention_layer = DualAttention(hidden_dim, hidden_dim)
 
-        self.fc = nn.Linear(hidden_dim, 10)  # Ausgabe für jede Sequenzposition
+        # Ausgabedimension bleibt unverändert bei 5 (angepasst an reduzierte Eingabe)
+        self.fc = nn.Linear(hidden_dim, 5)  # Ausgabe für jede Sequenzposition
 
     def forward(self, Y, X1, X2):
         Y_out, _ = self.Y_layer(Y)
@@ -38,7 +40,7 @@ class ThreeGroupLSTMModel(nn.Module):
 
         attended_output = self.dual_attention_layer(combined_output)  # Form: [Batch, Seq_length, hidden_dim]
 
-        output = self.fc(attended_output)  # Form: [Batch, Seq_length, 10]
+        output = self.fc(attended_output)  # Form: [Batch, Seq_length, 5]
         return output
 
 
@@ -51,24 +53,26 @@ class FusionModel(nn.Module):
         self.indicators_1_model = ThreeGroupLSTMModel(seq_length, hidden_dim)
         self.indicators_2_model = ThreeGroupLSTMModel(seq_length, hidden_dim)
 
+        # Anpassung: Dimensionen für die Fusion entsprechend angepasst
         self.fusion_fc = nn.Sequential(
-            nn.Linear(10 * 3, hidden_dim // 2),  # Eingabedimension angepasst auf 30
+            nn.Linear(5 * 3, hidden_dim // 2),  # Eingabedimension angepasst an 15 (5 x 3 Gruppen)
             nn.ReLU(),
-            nn.Linear(hidden_dim // 2, 10)
+            nn.Linear(hidden_dim // 2, 5)  # Ausgabedimension bleibt 5
         )
 
     def forward(self, Y, X1, X2):
-        standard_pred = self.standard_model(Y, X1, X2)      # [Batch, Seq_length, 10]
+        standard_pred = self.standard_model(Y, X1, X2)      # [Batch, Seq_length, 5]
         indicators_1_pred = self.indicators_1_model(Y, X1, X2)
         indicators_2_pred = self.indicators_2_model(Y, X1, X2)
 
         # Kombinieren entlang der Feature-Dimension
-        combined = torch.cat((standard_pred, indicators_1_pred, indicators_2_pred), dim=2)  # [Batch, Seq_length, 30]
+        combined = torch.cat((standard_pred, indicators_1_pred, indicators_2_pred), dim=2)  # [Batch, Seq_length, 15]
 
         # Wende fusion_fc auf jede Sequenzposition an
-        output = self.fusion_fc(combined)  # [Batch, Seq_length, 10]
+        output = self.fusion_fc(combined)  # [Batch, Seq_length, 5]
 
         return output
+
 
 
 def train_fusion_model(X_standard, X_group1, X_group2, Y_samples, hidden_dim, batch_size, learning_rate, epochs,

@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from matplotlib import pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 import pickle
 from experiment_2_model_layer import CustomLSTM, MultiInputLSTMWithGates, DualAttention
@@ -20,7 +21,7 @@ class ThreeGroupLSTMModel(nn.Module):
         self.hidden_dim = hidden_dim
 
         # Custom LSTM für die Hauptdatenquelle Y mit einer Eingabedimension von 10
-        self.Y_layer = CustomLSTM(10, hidden_dim, num_layers=num_layers, dropout=dropout)
+        self.Y_layer = CustomLSTM(5, hidden_dim, num_layers=num_layers, dropout=dropout)
 
         # Angepasste Eingabedimensionen für die LSTMs der Gruppen X1 und X2
         self.X1_layer = CustomLSTM(9, hidden_dim, num_layers=num_layers, dropout=dropout)
@@ -34,7 +35,7 @@ class ThreeGroupLSTMModel(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, 10)  # Endausgabe für 10 Features
+            nn.Linear(hidden_dim, 5)  # Endausgabe für 10 Features
         )
 
     def forward(self, Y, X1, X2):
@@ -59,67 +60,8 @@ class ThreeGroupLSTMModel(nn.Module):
         return output
 
 
-def train_group_model(group_name, X_samples, Y_samples, seq_length, hidden_dim, batch_size, learning_rate, epochs,
-                      model_dir):
-    """
-    Trainiert ein ThreeGroupLSTMModel für eine spezifische Gruppe von Daten (z.B., Standard, Indicators_Group_1).
-    Das Modell wird für eine Anzahl von Epochen mit dem Mean Squared Error (MSE) als Verlustfunktion und Adam als Optimierer trainiert.
-    """
-    # Initialisiere das Modell für die spezifische Gruppe und bewege es auf das Gerät (GPU, wenn verfügbar)
-    model = ThreeGroupLSTMModel(seq_length, hidden_dim).to(device)
-
-    # Konvertiere X_samples und Y_samples in Tensors, falls sie es nicht sind, und verschiebe sie auf das richtige Gerät
-    if not isinstance(X_samples, torch.Tensor):
-        X_samples = torch.tensor(X_samples, dtype=torch.float32)
-    if not isinstance(Y_samples, torch.Tensor):
-        Y_samples = torch.tensor(Y_samples, dtype=torch.float32)
-
-    # Übertrage die Daten auf das Gerät
-    X_samples = X_samples.to(device)
-    Y_samples = Y_samples.to(device)
-
-    # Definiere die Verlustfunktion und den Optimierer
-    criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-
-    # Erstelle einen Dataset- und Dataloader für die Eingabe- und Ziel-Daten
-    dataset = torch.utils.data.TensorDataset(X_samples, Y_samples)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-
-    # Setze das Modell in den Trainingsmodus
-    model.train()
-    for epoch in range(epochs):
-        running_loss = 0.0
-
-        for batch_idx, (X, y) in enumerate(dataloader):
-            X, y = X.to(device), y.to(device)  # Übertrage die Daten auf das Gerät
-
-            optimizer.zero_grad()  # Setze die Gradienten des Optimierers auf Null
-
-            # Vorhersage durchführen
-            output = model(X, X, X)
-
-            # Berechne den Verlust und führe Backpropagation durch
-            loss = criterion(output, y)
-            loss.backward()
-            optimizer.step()
-
-            running_loss += loss.item()
-
-        # Durchschnittlicher Verlust pro Epoche
-        epoch_loss = running_loss / len(dataloader)
-        print(f"Gruppe {group_name} - Epoch {epoch + 1}/{epochs}, Durchschnittlicher Verlust: {epoch_loss:.6f}")
-
-    # Speichere das trainierte Modell
-    model_path = os.path.join(model_dir, f"{group_name}_final.pth")
-    torch.save(model.state_dict(), model_path)
-    print(f"Modell für Gruppe {group_name} gespeichert unter {model_path}")
-
-    return model_path
-
-
 class FusionModel(nn.Module):
-    def __init__(self, hidden_dim=64, seq_length=30, output_features=10):
+    def __init__(self, hidden_dim=64, seq_length=30, output_features=5):
         super(FusionModel, self).__init__()
         self.hidden_dim = hidden_dim
         self.seq_length = seq_length
@@ -162,17 +104,28 @@ class FusionModel(nn.Module):
 
 def train_fusion_model(X_standard, X_group1, X_group2, Y_samples, hidden_dim, batch_size, learning_rate, epochs,
                        model_dir):
-    model = FusionModel(hidden_dim, seq_length=50, output_features=10).to(device)
+    model = FusionModel(hidden_dim).to(device)
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     dataset = torch.utils.data.TensorDataset(X_standard, X_group1, X_group2, Y_samples)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
-    scaler = torch.amp.GradScaler()
+
+    # Aufteilen in Trainings- und Validierungsdaten
+    val_split = int(0.8 * len(dataset))
+    train_dataset, val_dataset = torch.utils.data.random_split(dataset, [val_split, len(dataset) - val_split])
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
+    scaler = torch.amp.GradScaler('cuda')
 
     model.train()
+    train_loss_values = []
+    val_loss_values = []
+    val_mse_values = []
+    val_rmse_values = []
+
     for epoch in range(epochs):
         running_loss = 0.0
-        for batch_idx, (X_standard, X_group1, X_group2, y) in enumerate(dataloader):
+        for batch_idx, (X_standard, X_group1, X_group2, y) in enumerate(train_loader):
             X_standard, X_group1, X_group2, y = (
                 X_standard.float().to(device),
                 X_group1.float().to(device),
@@ -184,9 +137,8 @@ def train_fusion_model(X_standard, X_group1, X_group2, Y_samples, hidden_dim, ba
 
             with torch.amp.autocast(device_type='cuda'):
                 output = model(X_standard, X_group1, X_group2)
+                output = output[:, -30:, :]  # Kürzt die Ausgabe auf die letzten 30 Zeitschritte
 
-                # Verwende nur die letzten 30 Zeitschritte in der Loss-Berechnung
-                output = output[:, -30:, :]  # Ausgabe auf 30 Zeitschritte beschränken
                 loss = criterion(output, y)
 
             scaler.scale(loss).backward()  # Gradient scaling
@@ -195,12 +147,79 @@ def train_fusion_model(X_standard, X_group1, X_group2, Y_samples, hidden_dim, ba
 
             running_loss += loss.item()
 
-        epoch_loss = running_loss / len(dataloader)
-        print(f"Epoch {epoch + 1}/{epochs}, Durchschnittlicher Verlust: {epoch_loss:.6f}")
+        # Durchschnittlicher Trainingsverlust
+        epoch_loss = running_loss / len(train_loader)
+        train_loss_values.append(epoch_loss)
+        print(f"Epoch {epoch + 1}/{epochs}, Training Loss: {epoch_loss:.6f}")
 
+        # Validierungsmodus
+        model.eval()
+        val_loss = 0.0
+        val_mse = 0.0
+        with torch.no_grad():
+            for X_standard, X_group1, X_group2, y in val_loader:
+                X_standard, X_group1, X_group2, y = (
+                    X_standard.float().to(device),
+                    X_group1.float().to(device),
+                    X_group2.float().to(device),
+                    y.float().to(device),
+                )
+
+                output = model(X_standard, X_group1, X_group2)
+                output = output[:, -30:, :]  # Kürzt die Ausgabe auf die letzten 30 Zeitschritte
+
+                loss = criterion(output, y)
+                val_loss += loss.item()
+
+                # MSE berechnen
+                mse = nn.MSELoss()(output, y).item()
+                val_mse += mse
+
+        # Durchschnittlicher Validierungsverlust und Metriken
+        val_loss /= len(val_loader)
+        val_mse /= len(val_loader)
+        val_rmse = val_mse ** 0.5
+
+        val_loss_values.append(val_loss)
+        val_mse_values.append(val_mse)
+        val_rmse_values.append(val_rmse)
+
+        print(f"Validation Loss: {val_loss:.6f}, MSE: {val_mse:.6f}, RMSE: {val_rmse:.6f}")
+
+        model.train()  # Zurück in den Trainingsmodus
+
+    # Modell speichern
     model_path = os.path.join(model_dir, "fusion_model_final.pth")
     torch.save(model.state_dict(), model_path)
     print(f"Fusion Model gespeichert unter {model_path}")
+
+    # Plots erstellen
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(1, epochs + 1), train_loss_values, label="Training Loss", color="blue")
+    plt.plot(range(1, epochs + 1), val_loss_values, label="Validation Loss", color="orange")
+    plt.title("Training und Validation Loss über die Epochen")
+    plt.xlabel("Epoche")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.grid(True)
+    loss_plot_path = os.path.join(model_dir, "loss_plot.png")
+    plt.savefig(loss_plot_path)
+    plt.close()
+    print(f"Loss-Plot gespeichert unter {loss_plot_path}")
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(1, epochs + 1), val_mse_values, label="Validation MSE", color="green")
+    plt.plot(range(1, epochs + 1), val_rmse_values, label="Validation RMSE", color="red")
+    plt.title("Validation MSE und RMSE über die Epochen")
+    plt.xlabel("Epoche")
+    plt.ylabel("Fehler")
+    plt.legend()
+    plt.grid(True)
+    metrics_plot_path = os.path.join(model_dir, "metrics_plot.png")
+    plt.savefig(metrics_plot_path)
+    plt.close()
+    print(f"Metriken-Plot gespeichert unter {metrics_plot_path}")
+
     return model_path
 
 
