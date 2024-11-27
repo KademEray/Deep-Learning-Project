@@ -139,7 +139,9 @@ if __name__ == "__main__":
         output = model(X_standard, X_group1, X_group2)
         close_index = list(scaler.feature_names_in_).index('Close')
         predicted_price_scaled = output[0, -1, close_index].item()
+        print(f"Predicted Price Scaled: {predicted_price_scaled:.2f}")
         predicted_price = close_scaler.inverse_transform([[predicted_price_scaled]])[0, 0]
+        print(f"predicted_price: {predicted_price}")
 
     # Lade tatsächliche Preise
     try:

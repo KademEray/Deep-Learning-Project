@@ -234,11 +234,10 @@ if __name__ == '__main__':
     with open(os.path.join(samples_dir, 'Standard_Y.pkl'), 'rb') as f:
         Y_samples = pickle.load(f)  # Zielwerte für die Vorhersage
 
-    # Debug-Ausgabe zur Überprüfung der Form
-    print(f"Geladene X_standard Form: {X_standard.shape}")
-    print(f"Geladene X_group1 Form: {X_group1.shape}")
-    print(f"Geladene X_group2 Form: {X_group2.shape}")
-    print(f"Geladene Y_samples Form: {Y_samples.shape}")
+    print(f"Geladene X_standard Head: {X_standard[:1]}")
+    print(f"Geladene X_group1 Head: {X_group1[:1]}")
+    print(f"Geladene X_group2 Head: {X_group2[:1]}")
+    print(f"Geladene Y_samples Head: {Y_samples[:1]}")
 
     # Starte das Training des Fusion Models mit den geladenen Daten und Parametern
     train_fusion_model(

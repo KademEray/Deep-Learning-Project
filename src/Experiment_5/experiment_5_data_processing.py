@@ -150,7 +150,6 @@ if __name__ == "__main__":
     df = calculate_indicators(df)
     print(f"Datensatzgröße nach Hinzufügen der Indikatoren: {df.shape}")
 
-    # Zusätzliche Kryptowährungen (10 außer Bitcoin)
     additional_cryptos = [
         "GC=F", "SI=F", "CL=F", "BZ=F", "HG=F", "PL=F", "DX-Y.NYB", "^GSPC", "^IXIC", "ETH-USD", "BNB-USD", "SOL-USD", "ADA-USD", "XRP-USD",
         "DOGE-USD", "DOT-USD", "LTC-USD", "MATIC-USD", "AVAX-USD"
