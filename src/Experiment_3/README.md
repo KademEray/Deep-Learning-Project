@@ -64,6 +64,7 @@ Experiment 3 führt eine komplexere Modellarchitektur mit Attention-Mechanismen 
 ![alt text](../Experiment_2/Data/Models/metrics_plot.png)
 
 ## Ergebnis
+![alt text](Data/Models/experiment_3_ergebnis.png)
 - Kaufpreis am 2023-02-01: 23723.76953125
 - Tatsächlicher Preis am 2023-03-02: 23475.466796875
 - Vorhergesagter Preis: 23139.476272299886

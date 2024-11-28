@@ -60,6 +60,7 @@ Experiment 5 erweitert den Fokus von rein kryptowährungsbasierten Vorhersagen a
 ![alt text](Data/Models/metrics_plot.png)
 
 ## Ergebnis
+![alt text](Data/Models/experiment_5_ergebnis.png)
 - Kaufpreis am 2023-02-01: 23723.76953125
 - Tatsächlicher Preis am 2023-03-02: 23475.466796875
 - Vorhergesagter Preis: 19100.634425390042

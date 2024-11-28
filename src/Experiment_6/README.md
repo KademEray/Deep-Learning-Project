@@ -68,6 +68,7 @@ Experiment 6 erweitert das Modell um ein CNN-Modul, das die Erkennung von Muster
 ![alt text](Data/Models/metrics_plot.png)
 
 ## Ergebnis
+![alt text](Data/Models/experiment_6_ergebnis.png)
 - Kaufpreis am 2023-02-01: 23723.76953125
 - Tatsächlicher Preis am 2023-03-02: 23475.466796875
 - Vorhergesagter Preis: 18871.89256790196

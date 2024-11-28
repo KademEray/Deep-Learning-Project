@@ -64,6 +64,7 @@ Experiment 2 erweitert die Feature-Sets und passt die Modell-Eingabedimensionen 
 ![alt text](Data/Models/metrics_plot.png)
 
 ## Ergebnis
+![alt text](Data/Models/experiment_2_ergebnis.png)
 - Kaufpreis am 01.02.2023: 23723.76953125
 - Tatsächlicher Preis am 02.03.2023: 23475.466796875
 - Vorhergesagter Preis: 22962.032153532404
