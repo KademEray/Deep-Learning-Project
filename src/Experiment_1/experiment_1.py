@@ -96,6 +96,36 @@ group_features = {
     'Indicators_Group_2': ['cci', 'roc', 'bb_upper', 'bb_lower']  # Volatilitäts-Indikatoren
 }
 
+
+def calculate_baseline_from_independent_data(symbol, start_date, end_date):
+    """
+    Berechnet den MSE und Durchschnitt der Close-Werte aus unabhängigen Daten.
+
+    Parameters:
+        symbol (str): Tickersymbol der Kryptowährung.
+        start_date (str): Startdatum für die historischen Daten.
+        end_date (str): Enddatum für die historischen Daten.
+
+    Returns:
+        dict: Enthält den Durchschnitt der unabhängigen Close-Werte und den MSE basierend darauf.
+    """
+    try:
+        # Lade unabhängige Daten
+        independent_data = yf.download(symbol, start=start_date, end=end_date)
+        independent_close_prices = independent_data['Close'].dropna()  # Bereinige fehlende Werte
+
+        if independent_close_prices.empty:
+            raise ValueError("Unabhängige Daten enthalten keine Werte.")
+
+        # Berechne den Durchschnitt der unabhängigen Close-Werte
+        mean_baseline = independent_close_prices.mean()
+
+        return {"mean_baseline": mean_baseline}
+    except Exception as e:
+        print(f"Fehler beim Berechnen der Baseline: {e}")
+        return {"mean_baseline": None}
+
+
 # Hauptskript
 if __name__ == "__main__":
     # Definiere Speicherorte für das Modell und den Scaler
@@ -108,6 +138,10 @@ if __name__ == "__main__":
     seq_length = 50
     hidden_dim = 64
     crypto_symbol = "BTC-USD"
+
+    # Unabhängige Baseline-Daten
+    baseline_start_date = "2022-01-01"
+    baseline_end_date = "2023-02-01"
 
     # Lade den Scaler
     with open(scaler_path, 'rb') as f:
@@ -139,9 +173,7 @@ if __name__ == "__main__":
         output = model(X_standard, X_group1, X_group2)
         close_index = list(scaler.feature_names_in_).index('Close')
         predicted_price_scaled = output[0, -1, close_index].item()
-        print(f"Predicted Price Scaled: {predicted_price_scaled:.2f}")
         predicted_price = close_scaler.inverse_transform([[predicted_price_scaled]])[0, 0]
-        print(f"predicted_price: {predicted_price}")
 
     # Lade tatsächliche Preise
     try:
@@ -171,12 +203,17 @@ if __name__ == "__main__":
     # R^2 berechnen
     r2_score = 1 - (ss_residual / ss_total)
 
+    baseline_result = calculate_baseline_from_independent_data(
+        crypto_symbol, baseline_start_date, baseline_end_date
+    )
+
     # Drucke Ergebnisse
     print(f"Kaufpreis am 2023-02-01: {actual_start_price}")
     print(f"Tatsächlicher Preis am {forecast_date}: {actual_end_price}")
     print(f"Vorhergesagter Preis: {predicted_price}")
     print(f"Tatsächlicher Gewinn: {actual_gain}")
     print(f"Vorhergesagter Gewinn: {predicted_gain}")
+    print(f"Baseline Durchschnitt: {baseline_result['mean_baseline']}")
     print(f"MSE im Preis: {mse_price_error}")
     print(f"RMSE im Preis: {rmse_price_error}")
     print(f"R² (Bestimmtheitsmaß): {r2_score:.4f}")
@@ -194,6 +231,9 @@ if __name__ == "__main__":
         plt.scatter(pd.to_datetime(forecast_date), predicted_price, color='red', label='Vorhergesagter Preis', zorder=5)
         plt.scatter(pd.to_datetime("2023-02-01"), actual_start_price, color='green', label='Kaufpreis am 1. Februar',
                     zorder=5)
+        plt.axhline(y=baseline_result['mean_baseline'], color='orange', linestyle='--',
+                    label=f"Baseline (Durchschnitt: {baseline_result['mean_baseline']:.2f})")
+
         plt.title(f"Kursverlauf von {crypto_symbol} mit Vorhersage am {forecast_date}")
         plt.xlabel("Datum")
         plt.ylabel("Preis in USD")

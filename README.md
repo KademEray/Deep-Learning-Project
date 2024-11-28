@@ -76,3 +76,61 @@ Die Testdaten werden durch die **experiment_X.py**-Dateien verarbeitet:
 # Visualisierungen
 1. **Kursverlauf**: Darstellung der tatsächlichen und vorhergesagten Preise.
 2. **Trainingsmetriken**: Plots für Training- und Validation-Loss sowie MSE und RMSE.
+---
+# Ergebnisse
+---
+Experiment 1
+- Kaufpreis: 23723.76953125
+- Tatsächlicher Preis: 23475.466796875
+- Vorhergesagter Preis: 24873.352011097533
+- RMSE: 1397.8852142225332
+- R²: 0.9965
+- Prozentualer Fehler: 5.9547%
+---
+Experiment 2
+- Kaufpreis: 23723.76953125
+- Tatsächlicher Preis: 23475.466796875
+- Vorhergesagter Preis: 22962.032153532404
+- RMSE: 513.4346433425962
+- R²: 0.9995
+- Prozentualer Fehler: 2.1871%
+---
+Experiment 3
+- Kaufpreis: 23723.76953125
+- Tatsächlicher Preis: 23475.466796875
+- Vorhergesagter Preis: 23139.476272299886
+- RMSE: 335.99052457511425
+- R²: 0.9998
+- Prozentualer Fehler: 1.431241%
+---
+Experiment 4
+- Kaufpreis: 23723.76953125
+- Tatsächlicher Preis: 23475.466796875
+- Vorhergesagter Preis: 23139.482546299696
+- RMSE: 335.98425057530403
+- R²: 0.9998
+- Prozentualer Fehler: 1.431214%
+---
+Experiment 5
+- Kaufpreis: 23723.76953125
+- Tatsächlicher Preis: 23475.466796875
+- Vorhergesagter Preis: 19100.634425390042
+- RMSE: 4374.832371484958
+- R²: 0.9660
+- Prozentualer Fehler: 18.635763%
+---
+Experiment 6
+- Kaufpreis: 23723.76953125
+- Tatsächlicher Preis: 23475.466796875
+- Vorhergesagter Preis: 18871.89256790196
+- RMSE: 4603.574228973041
+- R²: 0.9623
+- Prozentualer Fehler: 19.610150%
+---
+Experiment 7
+- Kaufpreis: 23723.76953125
+- Tatsächlicher Preis: 23475.466796875
+- Vorhergesagter Preis: 23139.147860452533
+- RMSE: 336.31893642246723
+- R²: 0.9998
+- Prozentualer Fehler: 1.432640%
