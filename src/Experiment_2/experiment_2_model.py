@@ -16,6 +16,32 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class ThreeGroupLSTMModel(nn.Module):
+    """
+    A PyTorch neural network model that processes three groups of input sequences using custom LSTM layers,
+    applies multi-input LSTM with gating and dual attention mechanisms, and produces an output sequence.
+    Args:
+        seq_length (int): The length of the input sequences.
+        hidden_dim (int): The number of features in the hidden state of the LSTM.
+        num_layers (int, optional): The number of recurrent layers in the LSTM. Default is 3.
+        dropout (float, optional): The dropout probability for the LSTM layers. Default is 0.3.
+    Attributes:
+        hidden_dim (int): The number of features in the hidden state of the LSTM.
+        Y_layer (CustomLSTM): Custom LSTM layer for the main data source Y with an input dimension of 5.
+        X1_layer (CustomLSTM): Custom LSTM layer for the group X1 with an input dimension of 9.
+        X2_layer (CustomLSTM): Custom LSTM layer for the group X2 with an input dimension of 9.
+        multi_input_lstm (MultiInputLSTMWithGates): Multi-input LSTM with gating mechanism.
+        dual_attention_layer (DualAttention): Dual attention mechanism.
+        fc (nn.Sequential): Fully connected layer for each time step.
+    Methods:
+        forward(Y, X1, X2):
+            Processes the input sequences Y, X1, and X2 through the model and returns the output sequence.
+            Args:
+                Y (torch.Tensor): The main input sequence with shape [Batch, Seq, Features].
+                X1 (torch.Tensor): The input sequence for group X1 with shape [Batch, Seq, Features].
+                X2 (torch.Tensor): The input sequence for group X2 with shape [Batch, Seq, Features].
+            Returns:
+                torch.Tensor: The output sequence with shape [Batch, Seq, Features].
+    """
     def __init__(self, seq_length, hidden_dim, num_layers=3, dropout=0.3):
         super(ThreeGroupLSTMModel, self).__init__()
         self.hidden_dim = hidden_dim
@@ -61,6 +87,30 @@ class ThreeGroupLSTMModel(nn.Module):
 
 
 class FusionModel(nn.Module):
+    """
+    A PyTorch model that fuses predictions from three separate LSTM-based models.
+    Args:
+        hidden_dim (int): The number of features in the hidden state of the LSTM. Default is 64.
+        seq_length (int): The length of the input sequences. Default is 30.
+        output_features (int): The number of output features. Default is 5.
+    Attributes:
+        hidden_dim (int): The number of features in the hidden state of the LSTM.
+        seq_length (int): The length of the input sequences.
+        output_features (int): The number of output features.
+        standard_model (ThreeGroupLSTMModel): LSTM model for the standard group.
+        indicators_1_model (ThreeGroupLSTMModel): LSTM model for the first indicators group.
+        indicators_2_model (ThreeGroupLSTMModel): LSTM model for the second indicators group.
+        fusion_fc (nn.Sequential): Fully connected layers for fusing the outputs of the three models.
+    Methods:
+        forward(Y, X1, X2):
+            Forward pass of the model. Takes three input tensors and returns the fused output.
+            Args:
+                Y (torch.Tensor): Input tensor for the standard model.
+                X1 (torch.Tensor): Input tensor for the first indicators model.
+                X2 (torch.Tensor): Input tensor for the second indicators model.
+            Returns:
+                torch.Tensor: Fused output tensor.
+    """
     def __init__(self, hidden_dim=64, seq_length=30, output_features=5):
         super(FusionModel, self).__init__()
         self.hidden_dim = hidden_dim
@@ -102,8 +152,28 @@ class FusionModel(nn.Module):
         return output  # Gibt eine Ausgabe in der Form [Batch, Seq, Features]
 
 
-def train_fusion_model(X_standard, X_group1, X_group2, Y_samples, hidden_dim, batch_size, learning_rate, epochs,
-                       model_dir):
+def train_fusion_model(X_standard, X_group1, X_group2, Y_samples, hidden_dim, batch_size, learning_rate, epochs, model_dir):
+    """
+    Trains a fusion model using the provided datasets and parameters.
+    Args:
+        X_standard (torch.Tensor): Standard input features.
+        X_group1 (torch.Tensor): Group 1 input features.
+        X_group2 (torch.Tensor): Group 2 input features.
+        Y_samples (torch.Tensor): Target output samples.
+        hidden_dim (int): Dimension of the hidden layers in the model.
+        batch_size (int): Number of samples per batch.
+        learning_rate (float): Learning rate for the optimizer.
+        epochs (int): Number of training epochs.
+        model_dir (str): Directory to save the trained model and plots.
+    Returns:
+        str: Path to the saved model file.
+    The function performs the following steps:
+    1. Initializes the fusion model, loss criterion, and optimizer.
+    2. Splits the dataset into training and validation sets.
+    3. Trains the model for the specified number of epochs, recording training and validation losses.
+    4. Saves the trained model and plots of the loss and metrics over epochs.
+    """
+    
     model = FusionModel(hidden_dim).to(device)
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)

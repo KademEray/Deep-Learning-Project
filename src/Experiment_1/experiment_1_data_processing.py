@@ -42,6 +42,20 @@ def calculate_indicators(df):
 
 # Funktion zur Sequenzierung der Daten
 def generate_sequences(data, sequence_length=50, forecast_steps=30, target_feature_dim=10):
+    """
+    Generates sequences of data for time series forecasting.
+    Args:
+        data (pd.DataFrame): The input data from which sequences are generated.
+        sequence_length (int, optional): The length of the input sequences. Defaults to 50.
+        forecast_steps (int, optional): The number of steps to forecast. Defaults to 30.
+        target_feature_dim (int, optional): The number of features to consider in the target dimension. Defaults to 10.
+    Returns:
+        tuple: A tuple containing two torch tensors:
+            - X (torch.Tensor): The input sequences with shape [Batch, Seq, target_feature_dim].
+            - Y (torch.Tensor): The target sequences with shape [Batch, Seq, target_feature_dim].
+    Debug:
+        Prints the final shapes of X and Y for verification.
+    """
     X, Y = [], []
     for i in range(len(data) - sequence_length - forecast_steps):
         x_seq = data[i:i + sequence_length].values

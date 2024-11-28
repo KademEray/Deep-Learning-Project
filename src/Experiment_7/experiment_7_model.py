@@ -16,6 +16,27 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class DynamicLSTMModel(nn.Module):
+    """
+    A PyTorch model that dynamically creates LSTM layers for each input dimension, 
+    applies multi-input LSTM with gates, and uses dual attention mechanism.
+    Args:
+        seq_length (int): The length of the input sequences.
+        hidden_dim (int): The number of features in the hidden state of the LSTM.
+        input_sizes (list of int): A list of input dimensions for each LSTM layer.
+        num_layers (int, optional): Number of recurrent layers. Default is 3.
+        dropout (float, optional): Dropout probability. Default is 0.3.
+    Raises:
+        ValueError: If input_sizes is not a list of integers.
+    Methods:
+        forward(*inputs):
+            Forward pass of the model. Takes multiple inputs corresponding to each LSTM layer.
+            Args:
+                *inputs: Variable length input list where each element is a tensor of shape 
+                         (batch_size, seq_length, input_size).
+            Returns:
+                torch.Tensor: The output of the model after applying LSTM layers, multi-input LSTM, 
+                              dual attention, and fully connected layers.
+    """
     def __init__(self, seq_length, hidden_dim, input_sizes, num_layers=3, dropout=0.3):
         super(DynamicLSTMModel, self).__init__()
         self.hidden_dim = hidden_dim
@@ -63,6 +84,26 @@ class DynamicLSTMModel(nn.Module):
 
 
 class SimpleCNN(nn.Module):
+    """
+    A simple Convolutional Neural Network (CNN) for sequence data.
+    Args:
+        input_dim (int): Number of input channels/features.
+        seq_length (int): Length of the input sequences.
+        output_dim (int): Number of output classes.
+    Attributes:
+        conv1 (nn.Conv1d): First 1D convolutional layer.
+        conv2 (nn.Conv1d): Second 1D convolutional layer.
+        relu (nn.ReLU): ReLU activation function.
+        flattened_dim (int): Dimension of the flattened output from the convolutional layers.
+        fc (nn.Linear): Fully connected layer for classification.
+    Methods:
+        forward(x):
+            Defines the forward pass of the network.
+            Args:
+                x (torch.Tensor): Input tensor of shape (batch_size, seq_length, input_dim).
+            Returns:
+                torch.Tensor: Output tensor of shape (batch_size, output_dim).
+    """
     def __init__(self, input_dim, seq_length, output_dim):
         super(SimpleCNN, self).__init__()
         self.conv1 = nn.Conv1d(in_channels=input_dim, out_channels=32, kernel_size=3, padding=1)
@@ -90,6 +131,33 @@ class SimpleCNN(nn.Module):
 
 
 class FusionModelWithCNN(nn.Module):
+    """
+    A PyTorch model that fuses multiple LSTM models and a CNN model for time series prediction.
+    Args:
+        hidden_dim (int): The number of hidden units in the LSTM and CNN models. Default is 64.
+        seq_length (int): The length of the input sequences. Default is 30.
+        output_features (int): The number of output features. Default is 10.
+        group_features (dict): A dictionary containing the input dimensions for each group of features.
+    Attributes:
+        hidden_dim (int): The number of hidden units in the LSTM and CNN models.
+        seq_length (int): The length of the input sequences.
+        output_features (int): The number of output features.
+        input_sizes (dict): A dictionary containing the input dimensions for each group of features.
+        standard_model (DynamicLSTMModel): The LSTM model for the "Standard" group.
+        indicators_1_model (DynamicLSTMModel): The LSTM model for the "Indicators_Group_1" group.
+        indicators_2_model (DynamicLSTMModel): The LSTM model for the "Indicators_Group_2" group.
+        cnn_model (SimpleCNN): The CNN model for fusing the inputs.
+        fusion_fc (nn.Sequential): The fully connected layer for final fusion of the outputs.
+    Methods:
+        forward(Y, X1, X2):
+            Performs a forward pass through the model.
+            Args:
+                Y (torch.Tensor): The input tensor for the "Standard" group.
+                X1 (torch.Tensor): The input tensor for the "Indicators_Group_1" group.
+                X2 (torch.Tensor): The input tensor for the "Indicators_Group_2" group.
+            Returns:
+                torch.Tensor: The output tensor after fusion.
+    """
     def __init__(self, hidden_dim=64, seq_length=30, output_features=10, group_features=None):
         super(FusionModelWithCNN, self).__init__()
         self.hidden_dim = hidden_dim
@@ -148,6 +216,26 @@ class FusionModelWithCNN(nn.Module):
 
 
 def train_fusion_model_with_cnn(X_standard, X_group1, X_group2, Y_samples, hidden_dim, batch_size, learning_rate, epochs, model_dir):
+    """
+    Trains a fusion model with CNN using the provided datasets and parameters.
+    Args:
+        X_standard (torch.Tensor): Standard input features tensor.
+        X_group1 (torch.Tensor): Group 1 input features tensor.
+        X_group2 (torch.Tensor): Group 2 input features tensor.
+        Y_samples (torch.Tensor): Target output tensor.
+        hidden_dim (int): Dimension of the hidden layers.
+        batch_size (int): Size of each batch for training.
+        learning_rate (float): Learning rate for the optimizer.
+        epochs (int): Number of epochs to train the model.
+        model_dir (str): Directory to save the trained model and plots.
+    Returns:
+        str: Path to the saved model file.
+    Prints:
+        Shapes of the input tensors.
+        Training and validation loss for each epoch.
+        Validation MSE and RMSE for each epoch.
+        Paths to the saved model and plots.
+    """
     print(f"X_standard Shape: {X_standard.shape}")
     print(f"X_group1 Shape: {X_group1.shape}")
     print(f"X_group2 Shape: {X_group2.shape}")

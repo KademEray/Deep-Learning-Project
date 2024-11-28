@@ -82,6 +82,23 @@ def perform_correlation_with_close(df, target='Close', threshold=0.2):
 
 # Autoencoder-Klasse für nicht-lineare Reduktion
 class Autoencoder(nn.Module):
+    """
+    A simple Autoencoder neural network for dimensionality reduction and feature learning.
+    Args:
+        input_dim (int): The number of input features.
+        encoding_dim (int, optional): The dimension of the encoded representation. Default is 10.
+    Attributes:
+        encoder (nn.Sequential): The encoder part of the autoencoder, which compresses the input.
+        decoder (nn.Sequential): The decoder part of the autoencoder, which reconstructs the input from the encoded representation.
+    Methods:
+        forward(x):
+            Performs a forward pass through the autoencoder.
+            Args:
+                x (torch.Tensor): The input tensor.
+            Returns:
+                encoded (torch.Tensor): The encoded representation of the input.
+                decoded (torch.Tensor): The reconstructed input from the encoded representation.
+    """
     def __init__(self, input_dim, encoding_dim=10):
         super(Autoencoder, self).__init__()
         self.encoder = nn.Sequential(
@@ -103,6 +120,16 @@ class Autoencoder(nn.Module):
 
 
 def train_autoencoder(data_tensor, encoding_dim=10, epochs=50, lr=0.001):
+    """
+    Trains an autoencoder on the provided data tensor.
+    Args:
+        data_tensor (torch.Tensor): The input data tensor to be encoded and decoded.
+        encoding_dim (int, optional): The dimension of the encoding layer. Default is 10.
+        epochs (int, optional): The number of training epochs. Default is 50.
+        lr (float, optional): The learning rate for the optimizer. Default is 0.001.
+    Returns:
+        torch.Tensor: The encoded features of the input data tensor after training.
+    """
     input_dim = data_tensor.shape[1]
     autoencoder = Autoencoder(input_dim=input_dim, encoding_dim=encoding_dim).to(device)
     criterion = nn.MSELoss()
@@ -123,6 +150,23 @@ def train_autoencoder(data_tensor, encoding_dim=10, epochs=50, lr=0.001):
 
 
 def generate_sequences(data, sequence_length=50, forecast_steps=30):
+    """
+    Generates sequences of data for time series forecasting.
+    Args:
+        data (pd.DataFrame or pd.Series): The input time series data.
+        sequence_length (int, optional): The length of each input sequence. Defaults to 50.
+        forecast_steps (int, optional): The number of steps to forecast. Defaults to 30.
+    Returns:
+        tuple: A tuple containing two torch.Tensors:
+            - X (torch.Tensor): The input sequences of shape (num_sequences, sequence_length, num_features).
+            - Y (torch.Tensor): The corresponding forecast sequences of shape (num_sequences, forecast_steps, num_features).
+    Example:
+        >>> data = pd.DataFrame({'value': range(100)})
+        >>> X, Y = generate_sequences(data, sequence_length=10, forecast_steps=5)
+        >>> print(X.shape, Y.shape)
+        Debug: Final X shape (85, 10, 1), Y shape (85, 5, 1)
+        torch.Size([85, 10, 1]) torch.Size([85, 5, 1])
+    """
     X, Y = [], []
     for i in range(len(data) - sequence_length - forecast_steps):
         x_seq = data[i:i + sequence_length].values

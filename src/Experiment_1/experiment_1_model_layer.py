@@ -19,6 +19,22 @@ torch.backends.cudnn.benchmark = False
 
 
 class CustomLSTM(nn.Module):
+    """
+    Custom LSTM module.
+    Args:
+        input_dim (int): The number of expected features in the input.
+        hidden_dim (int): The number of features in the hidden state.
+        num_layers (int, optional): Number of recurrent layers. Default is 2.
+        dropout (float, optional): If non-zero, introduces a Dropout layer on the outputs of each LSTM layer except the last layer. Default is 0.2.
+    Methods:
+        forward(x):
+            Forward pass through the LSTM.
+            Args:
+                x (torch.Tensor): Input tensor of shape (batch_size, seq_length, input_dim).
+            Returns:
+                output (torch.Tensor): Output tensor containing the output features from the last layer of the LSTM for each time step.
+                hidden (torch.Tensor): Hidden state tensor from the last time step.
+    """
     def __init__(self, input_dim, hidden_dim, num_layers=2, dropout=0.2):
         super(CustomLSTM, self).__init__()
         self.lstm = nn.LSTM(
@@ -34,6 +50,26 @@ class CustomLSTM(nn.Module):
 
 
 class MultiInputLSTMWithGates(nn.Module):
+    """
+    A multi-input LSTM model with gating mechanism.
+    Args:
+        hidden_dim (int): The number of features in the hidden state.
+        output_dim (int): The number of features in the output.
+        num_layers (int, optional): Number of recurrent layers. Default is 2.
+        dropout (float, optional): If non-zero, introduces a Dropout layer on the outputs of each LSTM layer except the last layer, with dropout probability equal to dropout. Default is 0.2.
+    Methods:
+        forward(Y, X_p, X_n, Index, self_gate):
+            Forward pass of the model.
+            Args:
+                Y (torch.Tensor): Input tensor Y with shape [batch_size, seq_length, hidden_dim].
+                X_p (torch.Tensor): Input tensor X_p with shape [batch_size, seq_length, hidden_dim].
+                X_n (torch.Tensor): Input tensor X_n with shape [batch_size, seq_length, hidden_dim].
+                Index (torch.Tensor): Input tensor Index with shape [batch_size, seq_length, hidden_dim].
+                self_gate (torch.Tensor): Gating tensor with shape [batch_size, hidden_dim] or [batch_size, seq_length, hidden_dim].
+            Returns:
+                output (torch.Tensor): Output tensor from the LSTM with shape [batch_size, seq_length, output_dim].
+                hidden (torch.Tensor): The hidden state tensor from the last layer of the LSTM with shape [batch_size, output_dim].
+    """
     def __init__(self, hidden_dim, output_dim, num_layers=2, dropout=0.2):
         super(MultiInputLSTMWithGates, self).__init__()
         self.lstm = nn.LSTM(hidden_dim * 4, output_dim, num_layers=num_layers, dropout=dropout, batch_first=True)
@@ -58,6 +94,24 @@ class MultiInputLSTMWithGates(nn.Module):
 
 
 class DualAttention(nn.Module):
+    """
+    DualAttention applies attention mechanisms over both the time and input dimensions of the input tensor.
+    Args:
+        input_dim (int): The dimension of the input features.
+        output_dim (int): The dimension of the output features.
+    Methods:
+        forward(x):
+            Applies the dual attention mechanism to the input tensor.
+            Args:
+                x (torch.Tensor): The input tensor, which can be either 2D or 3D.
+                    - If 3D, the shape should be [Batch, Seq_length, Features].
+                    - If 2D, the shape should be [Seq_length, Features].
+            Returns:
+                torch.Tensor: The tensor after applying the dual attention mechanism, 
+                maintaining the shape [Batch, Seq_length, Features] if the input was 3D.
+            Raises:
+                ValueError: If the input tensor has an unexpected dimension.
+    """
     def __init__(self, input_dim, output_dim):
         super(DualAttention, self).__init__()
         self.time_attention = nn.Linear(input_dim, output_dim)

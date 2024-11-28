@@ -16,6 +16,32 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class DynamicLSTMModel(nn.Module):
+    """
+    A dynamic LSTM model that processes multiple input sequences with different dimensions, 
+    applies attention mechanisms, and outputs a sequence of features.
+    Args:
+        seq_length (int): The length of the input sequences.
+        hidden_dim (int): The number of features in the hidden state of the LSTM.
+        input_sizes (list of int): A list of input dimensions for each LSTM layer.
+        num_layers (int, optional): The number of recurrent layers in each LSTM. Default is 3.
+        dropout (float, optional): The dropout probability for the LSTM layers. Default is 0.3.
+    Attributes:
+        hidden_dim (int): The number of features in the hidden state of the LSTM.
+        lstm_layers (nn.ModuleList): A list of custom LSTM layers for each input dimension.
+        multi_input_lstm (MultiInputLSTMWithGates): A multi-input LSTM with gating mechanism.
+        dual_attention_layer (DualAttention): A dual attention layer for processing the combined input.
+        fc (nn.Sequential): A fully connected layer for transforming the attended output.
+    Methods:
+        forward(*inputs):
+            Processes the input sequences through the LSTM layers, applies attention mechanisms, 
+            and outputs a sequence of features.
+            Args:
+                *inputs: Variable length input list, each element is a tensor of shape 
+                         [batch_size, seq_length, input_size] corresponding to each input dimension.
+            Returns:
+                torch.Tensor: The output tensor of shape [batch_size, seq_length, 10], 
+                              where 10 is the number of output features.
+    """
     def __init__(self, seq_length, hidden_dim, input_sizes, num_layers=3, dropout=0.3):
         super(DynamicLSTMModel, self).__init__()
         self.hidden_dim = hidden_dim
@@ -59,6 +85,31 @@ class DynamicLSTMModel(nn.Module):
 
 
 class FusionModel(nn.Module):
+    """
+    A PyTorch model for fusing predictions from multiple DynamicLSTMModel instances.
+    Args:
+        hidden_dim (int): The number of features in the hidden state of the LSTM.
+        seq_length (int): The length of the input sequences.
+        output_features (int): The number of output features.
+        group_features (dict): A dictionary where keys are group names and values are lists of feature names for each group.
+    Attributes:
+        hidden_dim (int): The number of features in the hidden state of the LSTM.
+        seq_length (int): The length of the input sequences.
+        output_features (int): The number of output features.
+        standard_model (DynamicLSTMModel): The LSTM model for the standard group.
+        indicators_1_model (DynamicLSTMModel): The LSTM model for the first indicators group.
+        indicators_2_model (DynamicLSTMModel): The LSTM model for the second indicators group.
+        fusion_fc (nn.Sequential): A fully connected layer for fusing the outputs of the three LSTM models.
+    Methods:
+        forward(Y, X1, X2):
+            Forward pass of the model. Takes three inputs and returns the fused output.
+            Args:
+                Y (torch.Tensor): The input tensor for the standard model.
+                X1 (torch.Tensor): The input tensor for the first indicators model.
+                X2 (torch.Tensor): The input tensor for the second indicators model.
+            Returns:
+                torch.Tensor: The fused output tensor.
+    """
     def __init__(self, hidden_dim=64, seq_length=30, output_features=10, group_features=None):
         super(FusionModel, self).__init__()
         self.hidden_dim = hidden_dim
@@ -104,6 +155,21 @@ class FusionModel(nn.Module):
 
 
 def train_fusion_model(X_standard, X_group1, X_group2, Y_samples, hidden_dim, batch_size, learning_rate, epochs, model_dir):
+    """
+    Trains a fusion model using dynamic LSTM layers with multiple input groups and saves the trained model and training metrics.
+    Args:
+        X_standard (torch.Tensor): Standard input tensor of shape (batch_size, seq_length, input_dim_standard).
+        X_group1 (torch.Tensor): Group 1 input tensor of shape (batch_size, seq_length, input_dim_group1).
+        X_group2 (torch.Tensor): Group 2 input tensor of shape (batch_size, seq_length, input_dim_group2).
+        Y_samples (torch.Tensor): Target output tensor of shape (batch_size, seq_length, output_dim).
+        hidden_dim (int): Number of hidden units in the LSTM layers.
+        batch_size (int): Size of each batch for training.
+        learning_rate (float): Learning rate for the optimizer.
+        epochs (int): Number of epochs to train the model.
+        model_dir (str): Directory to save the trained model and plots.
+    Returns:
+        str: Path to the saved model file.
+    """
     input_sizes = [X_standard.shape[2], X_group1.shape[2], X_group2.shape[2]]  # Dynamische Bestimmung der Eingabedimensionen
 
     model = DynamicLSTMModel(seq_length=50, hidden_dim=hidden_dim, input_sizes=input_sizes).to(device)

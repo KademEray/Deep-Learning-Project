@@ -16,6 +16,33 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class DynamicLSTMModel(nn.Module):
+    """
+    A dynamic LSTM model that processes multiple input sequences with different dimensions,
+    applies attention mechanisms, and produces a final output.
+    Args:
+        seq_length (int): The length of the input sequences.
+        hidden_dim (int): The number of features in the hidden state of the LSTM.
+        input_sizes (list of int): A list of input dimensions for each LSTM layer.
+        num_layers (int, optional): The number of recurrent layers in the LSTM. Default is 3.
+        dropout (float, optional): The dropout probability. Default is 0.3.
+    Raises:
+        ValueError: If input_sizes is not a list of integers.
+    Attributes:
+        hidden_dim (int): The number of features in the hidden state of the LSTM.
+        lstm_layers (nn.ModuleList): A list of custom LSTM layers for each input dimension.
+        multi_input_lstm (MultiInputLSTMWithGates): A multi-input LSTM with gating mechanism.
+        dual_attention_layer (DualAttention): A dual attention layer.
+        fc (nn.Sequential): A fully connected layer for each time step.
+    Methods:
+        forward(*inputs):
+            Processes the input sequences through the LSTM layers, applies attention mechanisms,
+            and produces the final output.
+            Args:
+                *inputs: Variable length input list, where each input corresponds to a different dimension.
+            Returns:
+                torch.Tensor: The final output after processing through LSTM layers, attention mechanisms,
+                and fully connected layers.
+    """
     def __init__(self, seq_length, hidden_dim, input_sizes, num_layers=3, dropout=0.3):
         super(DynamicLSTMModel, self).__init__()
         self.hidden_dim = hidden_dim
@@ -63,6 +90,25 @@ class DynamicLSTMModel(nn.Module):
 
 
 class SimpleCNN(nn.Module):
+    """
+    A simple Convolutional Neural Network (CNN) for sequence data.
+    Args:
+        input_dim (int): Number of input features.
+        seq_length (int): Length of the input sequences.
+        output_dim (int): Number of output classes.
+    Attributes:
+        conv1 (nn.Conv1d): First 1D convolutional layer.
+        conv2 (nn.Conv1d): Second 1D convolutional layer.
+        fc (nn.Linear): Fully connected layer.
+        relu (nn.ReLU): ReLU activation function.
+    Methods:
+        forward(x):
+            Defines the forward pass of the network.
+            Args:
+                x (torch.Tensor): Input tensor of shape (batch_size, seq_length, input_dim).
+            Returns:
+                torch.Tensor: Output tensor of shape (batch_size, output_dim).
+    """
     def __init__(self, input_dim, seq_length, output_dim):
         super(SimpleCNN, self).__init__()
         self.conv1 = nn.Conv1d(in_channels=input_dim, out_channels=32, kernel_size=3, padding=1)
@@ -81,6 +127,34 @@ class SimpleCNN(nn.Module):
 
 
 class FusionModelWithCNN(nn.Module):
+    """
+    A PyTorch model that combines LSTM and CNN for feature fusion.
+    Args:
+        hidden_dim (int): The number of features in the hidden state of the LSTM.
+        seq_length (int): The length of the input sequences.
+        output_features (int): The number of output features.
+        group_features (dict): A dictionary where keys are group names and values are either the number of features 
+                               in that group or a list of feature names.
+    Attributes:
+        hidden_dim (int): The number of features in the hidden state of the LSTM.
+        seq_length (int): The length of the input sequences.
+        output_features (int): The number of output features.
+        input_sizes (dict): A dictionary containing the input sizes for each group.
+        standard_model (DynamicLSTMModel): The LSTM model for the "Standard" group.
+        indicators_1_model (DynamicLSTMModel): The LSTM model for the "Indicators_Group_1" group.
+        indicators_2_model (DynamicLSTMModel): The LSTM model for the "Indicators_Group_2" group.
+        cnn_model (SimpleCNN): The CNN model for feature fusion.
+        fusion_fc (nn.Sequential): The fully connected layer for final fusion.
+    Methods:
+        forward(Y, X1, X2):
+            Forward pass of the model.
+            Args:
+                Y (torch.Tensor): Input tensor for the "Standard" group.
+                X1 (torch.Tensor): Input tensor for the "Indicators_Group_1" group.
+                X2 (torch.Tensor): Input tensor for the "Indicators_Group_2" group.
+            Returns:
+                torch.Tensor: The output of the model after fusion.
+    """
     def __init__(self, hidden_dim=64, seq_length=30, output_features=10, group_features=None):
         super(FusionModelWithCNN, self).__init__()
         self.hidden_dim = hidden_dim
@@ -139,6 +213,26 @@ class FusionModelWithCNN(nn.Module):
 
 
 def train_fusion_model_with_cnn(X_standard, X_group1, X_group2, Y_samples, hidden_dim, batch_size, learning_rate, epochs, model_dir):
+    """
+    Trains a fusion model with CNN using the provided datasets and parameters.
+    Args:
+        X_standard (torch.Tensor): Standard input features tensor.
+        X_group1 (torch.Tensor): Group 1 input features tensor.
+        X_group2 (torch.Tensor): Group 2 input features tensor.
+        Y_samples (torch.Tensor): Target output tensor.
+        hidden_dim (int): Dimension of the hidden layers.
+        batch_size (int): Size of each batch for training.
+        learning_rate (float): Learning rate for the optimizer.
+        epochs (int): Number of epochs to train the model.
+        model_dir (str): Directory to save the trained model and plots.
+    Returns:
+        str: Path to the saved model file.
+    Prints:
+        Shapes of input tensors.
+        Training and validation loss for each epoch.
+        Validation MSE and RMSE for each epoch.
+        Paths to saved model and plots.
+    """
     print(f"X_standard Shape: {X_standard.shape}")
     print(f"X_group1 Shape: {X_group1.shape}")
     print(f"X_group2 Shape: {X_group2.shape}")
