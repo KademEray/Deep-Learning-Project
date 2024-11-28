@@ -2,7 +2,9 @@
 
 ## Kurzbeschreibung
 Das Ziel dieses Projekts ist die Vorhersage der Kursänderung (prozentualer Gewinn/Verlust) von Bitcoin, basierend auf historischen Daten und technischen Indikatoren. Das Modell verwendet eine auf Attention basierende Multi-Input LSTM-Architektur.
-
+---
+![alt text](Data/Models/Experiment1.jpg)
+---
 ## Datenbeschaffung
 - **Datenquelle**: `yfinance`
 - **Kryptowährung**: Bitcoin (`BTC-USD`)
@@ -373,14 +375,18 @@ Ergebnis: Zeigt die vorhergesagten Preise, Fehlermaße und einen Plot des Kursve
    python experiment_1_torchviz.py
    ```
 
+## Training
+![alt text](Data/Models/loss_plot.png)
+![alt text](Data/Models/metrics_plot.png)
+
 ## Ergebnisse
-    Kaufpreis am 2023-02-01: 23723.76953125
-    Tatsächlicher Preis am 2023-03-02: 23475.466796875
-    Vorhergesagter Preis: 24441.06708843768
-    Tatsächlicher Gewinn: -248.302734375
-    Vorhergesagter Gewinn: 717.2975571876814
-    MSE im Preis: 932383.9230659353
-    RMSE im Preis: 965.6002915626814
-    Absoluter Fehler: 965.6002915626814
-    Prozentualer Fehler: 4.1132%
-    R² (Bestimmtheitsmaß): 0.9983
+- Kaufpreis am 2023-02-01: 23723.76953125
+- Tatsächlicher Preis am 2023-03-02: 23475.466796875
+- Vorhergesagter Preis: 24441.06708843768
+- Tatsächlicher Gewinn: -248.302734375
+- Vorhergesagter Gewinn: 717.2975571876814
+- MSE im Preis: 932383.9230659353
+- RMSE im Preis: 965.6002915626814
+- Absoluter Fehler: 965.6002915626814
+- Prozentualer Fehler: 4.1132%
+- R² (Bestimmtheitsmaß): 0.9983
