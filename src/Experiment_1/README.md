@@ -380,6 +380,7 @@ Ergebnis: Zeigt die vorhergesagten Preise, Fehlermaße und einen Plot des Kursve
 ![alt text](Data/Models/metrics_plot.png)
 
 ## Ergebnisse
+![experiment_1_ergebnis.png](Data%2FModels%2Fexperiment_1_ergebnis.png)
 - Kaufpreis am 2023-02-01: 23723.76953125
 - Tatsächlicher Preis am 2023-03-02: 23475.466796875
 - Vorhergesagter Preis: 24441.06708843768
