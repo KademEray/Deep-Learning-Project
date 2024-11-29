@@ -71,7 +71,7 @@ Datenverarbeitung erfolgt in den **experiment_X_data_processing.py**-Dateien. Di
 
 ## Training
 Das Training erfolgt in den **experiment_X_model.py**-Dateien:
-- Modelle basieren auf **LSTMs**, **Attention-Mechanismen** und **CNNs**.
+- Modelle basieren auf **LSTMs**, **Attention-Mechanismen** und **CNNs** (Experiment 6 / 7).
 - Das Training berücksichtigt Validierungsdaten, um die Performance zu messen.
 
 ## Vorhersage
