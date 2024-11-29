@@ -7,6 +7,7 @@ Dieses Projekt konzentriert sich auf die Entwicklung und Verfeinerung von Deep-L
 
 ## Python-Version
 Das Projekt wurde mit **Python 3.10.11** entwickelt und getestet.
+CUDA-Version 12.4.
 
 ---
 
