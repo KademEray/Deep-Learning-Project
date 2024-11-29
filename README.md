@@ -61,7 +61,7 @@ pip install -r requirements.txt
 # Verwendung
 
 ## Datenverarbeitung
-Für jedes Experiment wird ein eigenes Datenverarbeitungsskript bereitgestellt. Dieses führt folgende Schritte aus:
+Datenverarbeitung erfolgt in den **experiment_X_data_processing.py**-Dateien. Dieses führt folgende Schritte aus:
 1. Laden der Kryptowährungsdaten von **Yahoo Finance**.
 2. Berechnung technischer Indikatoren.
 3. Feature-Reduktion durch Korrelationsanalyse oder Autoencoder.
@@ -73,7 +73,7 @@ Das Training erfolgt in den **experiment_X_model.py**-Dateien:
 - Das Training berücksichtigt Validierungsdaten, um die Performance zu messen.
 
 ## Vorhersage
-Die Testdaten werden durch die **experiment_X.py**-Dateien verarbeitet:
+Die Testdaten werden durch die **experiment_X.py**-Dateien / **experiment_X_cpu.py**-Dateien verarbeitet:
 1. Skalierung und Sequenzierung der Daten.
 2. Nutzung des trainierten Modells zur Vorhersage zukünftiger Kursbewegungen.
 
