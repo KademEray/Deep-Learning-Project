@@ -160,12 +160,6 @@ def generate_sequences(data, sequence_length=50, forecast_steps=30):
         tuple: A tuple containing two torch.Tensors:
             - X (torch.Tensor): The input sequences of shape (num_sequences, sequence_length, num_features).
             - Y (torch.Tensor): The corresponding forecast sequences of shape (num_sequences, forecast_steps, num_features).
-    Example:
-        >>> data = pd.DataFrame({'value': range(100)})
-        >>> X, Y = generate_sequences(data, sequence_length=10, forecast_steps=5)
-        >>> print(X.shape, Y.shape)
-        Debug: Final X shape (85, 10, 1), Y shape (85, 5, 1)
-        torch.Size([85, 10, 1]) torch.Size([85, 5, 1])
     """
     X, Y = [], []
     for i in range(len(data) - sequence_length - forecast_steps):
