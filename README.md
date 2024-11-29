@@ -16,6 +16,11 @@ Installiere die erforderlichen Python-Bibliotheken mit:
 ```bash
 pip install -r requirements.txt
 ```
+---
+## Ausführung
+1. experiment_x_data_processing.py
+2. experiment_x_model.py
+3. experiment_x.py (mit cuda (GPU)) oder experiment_x_cpu.py (ohne cuda (CPU))
 
 ---
 <br>
