@@ -335,7 +335,7 @@ Das Skript gibt die Ergebnisse der Modellbewertung aus:
   - Enthält die Modelllogik für Training und Evaluation.
   - Trainiert das Modell und speichert die Ergebnisse in `fusion_model_final.pth`.
 
-- **`experiment_1.py`**: 
+- **`experiment_1.py`** / **`experiment_1_cpu.py`**: 
   - Führt Vorhersagen auf Testdaten aus und visualisiert die Ergebnisse.
   - **Eingabe**: `fusion_model_final.pth`, Testdaten von `yfinance`.
   - **Ausgabe**: Vorhergesagte Preise und Performance-Metriken.
@@ -362,18 +362,11 @@ Ergebnis: Trainiert das Modell und speichert es unter ./Data/Models/fusion_model
    ```bash
    python experiment_1.py
    ```
+   oder
+   ```bash
+   python experiment_1_cpu.py
+   ```
 Ergebnis: Zeigt die vorhergesagten Preise, Fehlermaße und einen Plot des Kursverlaufs.
-
-4. **Visualisierung des Modells**:
-    ```bash
-   python experiment_1_tensorboard.py
-   ```
-   ```bash
-   python experiment_1_netron.py
-   ```
-   ```bash
-   python experiment_1_torchviz.py
-   ```
 
 ## Training
 ![alt text](Data/Models/loss_plot.png)
