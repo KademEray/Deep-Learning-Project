@@ -21,10 +21,12 @@ pip install -r requirements.txt
 1. experiment_x_data_processing.py
 2. experiment_x_model.py
 3. experiment_x.py (mit cuda (GPU)) oder experiment_x_cpu.py (ohne cuda (CPU))
+---
+
+## Anmerkung
+Die Ergebnisse können von meinen aufgezeichneten Ergebnissen abweichen. In meinen Experimenten wurde eine GPU für die Berechnungen verwendet. Wenn die Skripte stattdessen auf einer CPU ausgeführt werden, können geringfügige Unterschiede in den Ergebnissen auftreten. Diese Unterschiede sind auf die verschiedenen numerischen Berechnungspräzisionen und Optimierungen zwischen GPU- und CPU-Architekturen zurückzuführen. Es wird empfohlen, für eine möglichst genaue Reproduktion der Ergebnisse ebenfalls eine GPU zu nutzen.
 
 ---
-<br>
-<br>
 
 # Experimente
 
